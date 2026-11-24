@@ -4,7 +4,7 @@
 // @homepageURL  https://github.com/peterbrek/reddit-szuro
 // @updateURL    https://raw.githubusercontent.com/peterbrek/reddit-szuro/main/reddit-szuro.user.js
 // @downloadURL  https://raw.githubusercontent.com/peterbrek/reddit-szuro/main/reddit-szuro.user.js
-// @version      1.0.0
+// @version      1.1.0
 // @description  Elrejti a Reddit-feedből azokat a posztokat, amelyekben a megadott kulcsszavak szerepelnek.
 // @match        https://www.reddit.com/*
 // @match        https://old.reddit.com/*
@@ -34,8 +34,7 @@
     'putyin',
     '',
     '# Tech-vezérek',
-    'elon',
-    '-elongat',
+    'elon musk',
     'musk',
     '-muskát',
     '-muskotály',
@@ -44,9 +43,28 @@
     'huang',
     'nvidia ceo',
     'nvidia vezér',
-  ].join('\n');
+    '',
+  ].concat(GTA_LINES()).join('\n');
 
-  const DEFAULTS = { list: DEFAULT_LIST, showHidden: false };
+  function GTA_LINES() {
+    return [
+      '# Játékok',
+      'gta 6',
+      'gta6',
+      '"gta vi"',
+      '"gtavi"',
+      'grand theft auto 6',
+      '"grand theft auto vi"',
+      'r/GTA6',
+      'r/GTAVI',
+    ];
+  }
+
+  // A lista változata. Ha nő, a már elmentett listákon is lefut a frissítés (migrate),
+  // a saját sorok megmaradnak.
+  const LIST_VERSION = 2;
+
+  const DEFAULTS = { list: DEFAULT_LIST, showHidden: false, listVersion: LIST_VERSION };
 
   const hasGM = typeof GM !== 'undefined' && GM && typeof GM.getValue === 'function';
 
@@ -54,9 +72,31 @@
     if (!raw) return null;
     try {
       const obj = typeof raw === 'string' ? JSON.parse(raw) : raw;
-      if (obj && typeof obj.list === 'string') return Object.assign({}, DEFAULTS, obj);
+      if (obj && typeof obj.list === 'string') {
+        return { list: obj.list, showHidden: !!obj.showHidden, listVersion: obj.listVersion || 1 };
+      }
     } catch (e) { /* sérült adat: marad az alap */ }
     return null;
+  }
+
+  // 1 → 2: az „elon” helyett „elon musk” (az ékezet nélkül „elont” lesz az „elönt”-ből is),
+  // az „-elongat” kivétel már nem kell, és bekerülnek a GTA 6-os sorok.
+  function migrate(s) {
+    if (!s) return { s, changed: false };
+    let changed = false;
+    if (s.listVersion < 2) {
+      let lines = s.list.split(/\r?\n/);
+      lines = lines
+        .map((l) => (l.trim().toLowerCase() === 'elon' ? 'elon musk' : l))
+        .filter((l) => l.trim().toLowerCase() !== '-elongat');
+      if (!lines.some((l) => /gta|grand theft auto/i.test(l))) {
+        while (lines.length && !lines[lines.length - 1].trim()) lines.pop();
+        lines = lines.concat([''], GTA_LINES());
+      }
+      s = { list: lines.join('\n'), showHidden: s.showHidden, listVersion: 2 };
+      changed = true;
+    }
+    return { s, changed };
   }
 
   function loadLocal() {
@@ -69,12 +109,17 @@
   }
 
   function save() {
-    const raw = JSON.stringify({ list: settings.list, showHidden: settings.showHidden });
+    const raw = JSON.stringify({
+      list: settings.list,
+      showHidden: settings.showHidden,
+      listVersion: settings.listVersion || LIST_VERSION,
+    });
     try { localStorage.setItem(STORE_KEY, raw); } catch (e) { /* privát mód */ }
     if (hasGM) { try { GM.setValue(STORE_KEY, raw); } catch (e) { /* nincs GM */ } }
   }
 
-  let settings = loadLocal() || Object.assign({}, DEFAULTS);
+  const local = migrate(loadLocal());
+  let settings = local.s || Object.assign({}, DEFAULTS);
 
   // ---------------------------------------------------------------------------
   // Kulcsszavak értelmezése
@@ -514,17 +559,22 @@ ul.hidden .kw { display: inline-block; font-weight: 600; color: #e5484d; margin-
   window.addEventListener('load', rescanAll, { once: true });
 
   // A bővítmény saját tárolója az elsődleges; a helyi másolat csak a gyors induláshoz kell.
-  loadGM().then((stored) => {
-    if (!stored) { if (hasGM) save(); return; }
+  loadGM().then((fromGM) => {
+    const gm = migrate(fromGM);
+    const stored = gm.s;
+    // Nincs mentés a bővítményben (első indítás, vagy nincs GM): a helyi/alap lista megy bele.
+    if (!stored) { save(); return; }
     if (stored.list !== settings.list || stored.showHidden !== settings.showHidden) {
       settings = stored;
       matcher = buildMatcher(settings.list);
-      try { localStorage.setItem(STORE_KEY, JSON.stringify(settings)); } catch (e) { /* privát mód */ }
       applyShowClass();
       rescanAll();
+      save();
+    } else if (gm.changed || local.changed) {
+      save();
     }
   });
 
   // Teszteléshez és hibakereséshez.
-  window.__redditSzuro = { norm, parseList, buildMatcher, rescanAll, version: '1.0.0' };
+  window.__redditSzuro = { norm, parseList, buildMatcher, migrate, rescanAll, version: '1.1.0' };
 })();

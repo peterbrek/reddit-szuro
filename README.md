@@ -46,7 +46,7 @@ A 🙈 gombra koppintva nyílik a panel. A kulcsszavakat soronként írod be, a 
 | `r/politics` | Az egész subreddit |
 | `# Politika` | Megjegyzés, csak a rendezéshez |
 
-A kis- és nagybetű és az ékezet nem számít (`putyin` = Putyin).
+A kis- és nagybetű és az ékezet nem számít (`putyin` = Putyin). Emiatt egy rövid kulcsszó magyar szavak elejére is ráillhet: az `elon` például az „elönt”-re is, ezért van a listában `elon musk`. Ilyenkor írj hosszabb kifejezést, tedd idézőjelbe, vagy vegyél fel kivételt.
 
 **Mit néz:** a poszt címét, a flairt, a szövegét, a hivatkozott cikk címét (URL), és áthúzott posztnál az eredeti címét.
 
@@ -64,8 +64,7 @@ putin
 putyin
 
 # Tech-vezérek
-elon
--elongat
+elon musk
 musk
 -muskát
 -muskotály
@@ -74,9 +73,19 @@ altman
 huang
 nvidia ceo
 nvidia vezér
+
+# Játékok
+gta 6
+gta6
+"gta vi"
+"gtavi"
+grand theft auto 6
+"grand theft auto vi"
+r/GTA6
+r/GTAVI
 ```
 
-A kivételek a gyakori téves találatokat engedik át: trumpet, elongated, muskátli, muskotály, musket.
+A kivételek a gyakori téves találatokat engedik át: trumpet, muskátli, muskotály, musket. A `"gta vi"` idézőjelben áll, hogy a GTA Vice City-s posztok maradjanak.
 
 ## Hol tárolódik a lista
 
@@ -95,8 +104,9 @@ Eszközönként külön, a Userscripts saját tárolójában és a reddit.com he
 
 ## Frissítés
 
-A szkript fejlécében benne van a frissítési cím, így a Userscripts és a Tampermonkey innen tölti le az új verziót. Ha egy javítás nem jön meg magától, nyisd meg újra a telepítőlinket, és telepítsd rá a régire. A kulcsszólistád megmarad.
+A szkript fejlécében benne van a frissítési cím, így a Userscripts és a Tampermonkey innen tölti le az új verziót. Ha egy javítás nem jön meg magától, nyisd meg újra a telepítőlinket, és telepítsd rá a régire. A kulcsszólistád megmarad. Ha egy új verzió az alap listán is változtat, azt a változást a már elmentett listádon is elvégzi, a saját sorodhoz nem nyúl.
 
 ## Verziók
 
+- **1.1.0** (2026-11-24): `elon` helyett `elon musk` (az `elon` az „elönt”-re is illett), új GTA 6-os sorok. A már elmentett listák maguktól frissülnek.
 - **1.0.0** (2026-11-23): első változat.
