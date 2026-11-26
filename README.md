@@ -60,7 +60,7 @@ A panelen, a többi kapcsoló között a **Kártyanézet** kapcsolóval a feed T
 
 A kártyán csak ennyi van:
 
-- **felül** a poszt címe;
+- **felül** a subreddit neve, alatta nagy betűkkel a poszt címe (legfeljebb hat sor, a hosszabb „…”-tal végződik);
 - **a háttérben, kitöltve** a poszt képe vagy videója (a videó némítva, ismétlődve megy, és csak akkor játszik, amikor a kártya látszik);
 - **alul** a poszt szövege, alatta sötét színátmenettel, hogy olvasható legyen;
 - **jobb alul** a hozzászólások száma.
@@ -131,6 +131,7 @@ A szkript fejlécében benne van a frissítési cím, így a Userscripts és a T
 
 ## Verziók
 
+- **1.5.1** (2026-11-26): kétszer akkora cím a kártyán, fölötte a subreddit neve.
 - **1.5.0** (2026-11-26): kártyanézetben eltűnik a Reddit fejléce, keresője és fülsora, csak a kártyák maradnak.
 - **1.4.0** (2026-11-26): új kártyák: cím felül, kép vagy videó kitöltve a háttérben, szöveg alul sötét átmeneten, hozzászólásszám; koppintásra a poszthoz visz.
 - **1.3.1** (2026-11-26): a kártyanézet kapcsolója a többi kapcsoló mellé került.
