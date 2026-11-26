@@ -69,6 +69,8 @@ A kártyára koppintva a poszt oldalára jutsz.
 
 Kártyanézetben a Reddit fejléce (menü, logó, értesítések), a kereső és a „For You / Following” fülsor eltűnik, csak a kártyák maradnak. Ezekhez a 🙈 panelen kapcsold ki a kártyanézetet. A legutóbb kiválasztott fül marad érvényben. Kép nélküli posztnál a háttér egy, a subreddithez igazodó színátmenet. Az apró bélyegképeket nem nyújtja szét, az NSFW- és spoilerképeket elmosva, címkével mutatja. Ha a Safari nem tudja lejátszani a videót, a videó előnézeti képe lesz a háttér.
 
+Egyszerre csak egy kártya látszik: a kártya mindig a ténylegesen látható magasságot tölti ki (a Safari összecsukódó sávjaival együtt), és amikor a lapozás megáll, a szomszédos kártyák elrejtőznek, így a következő kártya teteje az átlátszó eszköztár mögött sem bukkan elő. Húzás közben mindkettő látszik, hogy az átmenet sima legyen.
+
 A kártyák csak fel-le lapozhatók: oldalra nem húzhatók, és a kép vagy a link sem fogható meg. (A képernyő legszéléről indított oldalra húzás a Safari saját vissza/előre mozdulata, azt egy weboldal nem tudja letiltani.)
 
 Az elrejtett posztokat átugorja. A reklámposztok is külön kártyát kapnak, de azokat a Reddit rajzolja. A megnyitott poszt oldalán normál a görgetés. Egy-egy betöltött adag végén egyszer szabadon görgethetsz, amíg a Reddit betölti a következő posztokat, utána újra kártyánként lapoz. A beállítás eszközönként külön tárolódik.
@@ -133,6 +135,7 @@ A szkript fejlécében benne van a frissítési cím, így a Userscripts és a T
 
 ## Verziók
 
+- **1.6.0** (2026-11-26): egyszerre csak egy kártya látszik, a következő teteje nem lóg be.
 - **1.5.3** (2026-11-26): kártyanézetben csak fel-le lehet lapozni, oldalra nem mozdul az oldal.
 - **1.5.2** (2026-11-26): a cím a korábbi méret 80%-a, a szöveg kisebb és legfeljebb 200 karakter.
 - **1.5.1** (2026-11-26): kétszer akkora cím a kártyán, fölötte a subreddit neve.

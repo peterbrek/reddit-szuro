@@ -4,7 +4,7 @@
 // @homepageURL  https://github.com/peterbrek/reddit-szuro
 // @updateURL    https://raw.githubusercontent.com/peterbrek/reddit-szuro/main/reddit-szuro.user.js
 // @downloadURL  https://raw.githubusercontent.com/peterbrek/reddit-szuro/main/reddit-szuro.user.js
-// @version      1.5.3
+// @version      1.6.0
 // @description  Elrejti a Reddit-feedből azokat a posztokat, amelyekben a megadott kulcsszavak szerepelnek.
 // @match        https://www.reddit.com/*
 // @match        https://old.reddit.com/*
@@ -631,7 +631,9 @@ body { overflow-x: clip !important; }
 ${CARD} { width: auto !important; max-width: none !important; touch-action: pan-y; touch-action: pan-y pinch-zoom; }
 ${CARD} {
   box-sizing: border-box !important;
+  /* Mindig a ténylegesen látható magasság: a Safari összecsukódó sávjaival együtt változik. */
   height: calc(100svh - var(--rsz-top, 0px) - 16px) !important;
+  height: calc(100dvh - var(--rsz-top, 0px) - 16px) !important;
   margin: 8px !important; padding: 16px 4px !important;
   display: flex !important; flex-direction: column !important; justify-content: center !important;
   overflow: hidden !important;
@@ -648,9 +650,44 @@ ${POSTCARD} shreddit-post {
 }
 ${POSTCARD} shreddit-player, ${POSTCARD} shreddit-player-2 { display: none !important; }
 ${each(' + hr')} { display: none !important; }
-${each(' shreddit-ad-post')} { width: 100% !important; }`;
+${each(' shreddit-ad-post')} { width: 100% !important; }
+${!moving && hasCurrent ? `${each(':not([data-rsz-cur])')} { visibility: hidden !important; }` : ''}`;
 
   let topPx = 0;
+
+  // Nyugalmi helyzetben csak az aktuális kártya látszik, így a következő kártya teteje
+  // a Safari átlátszó eszköztára mögött sem bukkan elő. Lapozás közben minden kártya látszik.
+  let moving = true;
+  let hasCurrent = false;
+  let settleTimer = 0;
+
+  function markCurrent() {
+    let cur = null;
+    if (cardModeActive()) {
+      const mid = window.innerHeight / 2;
+      for (const c of document.querySelectorAll(CARD)) {
+        const r = c.getBoundingClientRect();
+        if (r.height && r.top <= mid && r.bottom >= mid) { cur = c; break; }
+      }
+    }
+    document.querySelectorAll('[data-rsz-cur]').forEach((e) => { if (e !== cur) e.removeAttribute('data-rsz-cur'); });
+    if (cur && !cur.hasAttribute('data-rsz-cur')) cur.setAttribute('data-rsz-cur', '');
+    hasCurrent = !!cur;
+  }
+
+  function settle() {
+    clearTimeout(settleTimer);
+    moving = false;
+    markCurrent();
+    ensureStyle();
+  }
+
+  function onScroll() {
+    if (!cardModeActive()) return;
+    if (!moving) { moving = true; ensureStyle(); }
+    clearTimeout(settleTimer);
+    settleTimer = setTimeout(settle, 160);
+  }
 
   // Kártyanézetben csak a kártyák maradnak: a feed előtt álló elemeket (fejléc, kereső,
   // fülsor, bal oldali menü) elrejtjük. A feed utáni elemekhez nem nyúlunk, mert köztük van
@@ -872,6 +909,8 @@ ul.hidden .kw { display: inline-block; font-weight: 600; color: #e5484d; margin-
       if (u) u.count.textContent = String(document.querySelectorAll('.' + HID).length);
       if (markOffpath()) measureTop();
       watchLastCard();
+      // Ha a Reddit újrarajzolta az aktuális kártyát, újra kijelöljük, nehogy eltűnjön.
+      if (!moving && hasCurrent && !document.querySelector('[data-rsz-cur]')) settle();
     });
   }
 
@@ -901,9 +940,11 @@ ul.hidden .kw { display: inline-block; font-weight: 600; color: #e5484d; margin-
     card.checked = !!settings.cardMode;
     card.addEventListener('change', () => {
       settings.cardMode = card.checked;
+      moving = true;
       ensureStyle();
       measureTop();
       rescanAll();
+      setTimeout(settle, 300);
       save();
     });
 
@@ -985,16 +1026,18 @@ ul.hidden .kw { display: inline-block; font-weight: 600; color: #e5484d; margin-
     attributeFilter: ['post-title'],
   });
 
-  const onReady = () => { ensureUi(); rescanAll(); measureTop(); };
+  const onReady = () => { ensureUi(); rescanAll(); measureTop(); setTimeout(settle, 300); };
+  window.addEventListener('scroll', onScroll, { passive: true });
+  window.addEventListener('scrollend', () => { if (cardModeActive()) settle(); });
   let resizeTimer = 0;
   window.addEventListener('resize', () => {
     clearTimeout(resizeTimer);
-    resizeTimer = setTimeout(measureTop, 250);
+    resizeTimer = setTimeout(() => { measureTop(); settle(); }, 250);
   });
   window.addEventListener('popstate', () => { lastPath = location.pathname; ensureStyle(); });
   if (document.readyState === 'loading') document.addEventListener('DOMContentLoaded', onReady, { once: true });
   else onReady();
-  window.addEventListener('load', () => { rescanAll(); measureTop(); }, { once: true });
+  window.addEventListener('load', () => { rescanAll(); measureTop(); settle(); }, { once: true });
 
   // A bővítmény saját tárolója az elsődleges; a helyi másolat csak a gyors induláshoz kell.
   loadGM().then((fromGM) => {
@@ -1008,7 +1051,7 @@ ul.hidden .kw { display: inline-block; font-weight: 600; color: #e5484d; margin-
       matcher = buildMatcher(settings.list);
       applyShowClass();
       rescanAll();
-      if (document.body) measureTop();
+      if (document.body) { measureTop(); setTimeout(settle, 100); }
       save();
     } else if (gm.changed || local.changed) {
       save();
@@ -1016,5 +1059,5 @@ ul.hidden .kw { display: inline-block; font-weight: 600; color: #e5484d; margin-
   });
 
   // Teszteléshez és hibakereséshez.
-  window.__redditSzuro = { norm, parseList, buildMatcher, migrate, rescanAll, version: '1.5.3' };
+  window.__redditSzuro = { norm, parseList, buildMatcher, migrate, rescanAll, version: '1.6.0' };
 })();
