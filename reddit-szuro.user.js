@@ -4,7 +4,7 @@
 // @homepageURL  https://github.com/peterbrek/reddit-szuro
 // @updateURL    https://raw.githubusercontent.com/peterbrek/reddit-szuro/main/reddit-szuro.user.js
 // @downloadURL  https://raw.githubusercontent.com/peterbrek/reddit-szuro/main/reddit-szuro.user.js
-// @version      1.2.0
+// @version      1.3.0
 // @description  Elrejti a Reddit-feedből azokat a posztokat, amelyekben a megadott kulcsszavak szerepelnek.
 // @match        https://www.reddit.com/*
 // @match        https://old.reddit.com/*
@@ -64,7 +64,9 @@
   // a saját sorok megmaradnak.
   const LIST_VERSION = 2;
 
-  const DEFAULTS = { list: DEFAULT_LIST, showHidden: false, hidePromos: true, listVersion: LIST_VERSION };
+  const DEFAULTS = {
+    list: DEFAULT_LIST, showHidden: false, hidePromos: true, cardMode: false, listVersion: LIST_VERSION,
+  };
 
   const hasGM = typeof GM !== 'undefined' && GM && typeof GM.getValue === 'function';
 
@@ -77,6 +79,7 @@
           list: obj.list,
           showHidden: !!obj.showHidden,
           hidePromos: obj.hidePromos !== false,
+          cardMode: !!obj.cardMode,
           listVersion: obj.listVersion || 1,
         };
       }
@@ -118,6 +121,7 @@
       list: settings.list,
       showHidden: settings.showHidden,
       hidePromos: settings.hidePromos !== false,
+      cardMode: !!settings.cardMode,
       listVersion: settings.listVersion || LIST_VERSION,
     });
     try { localStorage.setItem(STORE_KEY, raw); } catch (e) { /* privát mód */ }
@@ -301,8 +305,13 @@
     scheduleBadge();
   }
 
+  let lastPath = location.pathname;
+
   const observer = new MutationObserver((mutations) => {
-    if (!styleEl || !styleEl.isConnected) ensureStyle();
+    if (!styleEl || !styleEl.isConnected || location.pathname !== lastPath) {
+      lastPath = location.pathname;
+      ensureStyle();
+    }
     const found = new Set();
     for (const m of mutations) {
       if (m.type === 'attributes') {
@@ -329,7 +338,7 @@
   // ---------------------------------------------------------------------------
 
   // A két mód közt a stíluslap szövege vált, így nem függünk a Reddit <html> osztályaitól.
-  const HIDE_CSS = `.${HID}, .${HID} + hr { display: none !important; }`;
+  const HIDE_CSS = `html .${HID}, html .${HID} + hr { display: none !important; }`;
   const SHOW_CSS = `
 .${HID} { opacity: .45; outline: 2px dashed #e5484d; outline-offset: -2px; }
 .${HID}::before {
@@ -374,6 +383,90 @@ body.rpl-scroll-lock:has(shreddit-async-loader[bundlename="app_selector"]) {
     } catch (e) { /* privát mód */ }
   }
 
+  // Kártyanézet: minden poszt egy képernyőnyi kártya, a lapozás poszttól posztig ugrik.
+  // Csak CSS, a Reddit oldalszerkezetéhez nem nyúl, így a végtelen görgetés is megmarad.
+  // A reklámposzt is kártya lesz, különben a lapozás megakadna előtte.
+  const CARD = 'article:has(shreddit-post), article:has(shreddit-ad-post), shreddit-feed > shreddit-ad-post';
+  const each = (suffix) => CARD.split(', ').map((c) => c + suffix).join(', ');
+  const cardCss = () => `
+html { scroll-snap-type: y ${atEnd ? 'proximity' : 'mandatory'} !important; scroll-padding-top: var(--rsz-top, 0px) !important; }
+body { scroll-snap-align: start; }
+shreddit-feed { scroll-snap-align: end; }
+${CARD} {
+  box-sizing: border-box !important;
+  min-height: calc(100svh - var(--rsz-top, 0px) - 16px) !important;
+  margin: 8px !important; padding: 16px 4px !important;
+  display: flex !important; flex-direction: column !important; justify-content: center !important;
+  border-radius: 22px !important;
+  background: rgba(127,127,127,.08) !important;
+  border: 1px solid rgba(127,127,127,.18) !important;
+  scroll-snap-align: start; scroll-snap-stop: always; scroll-margin-top: 8px;
+}
+${each(' + hr')} { display: none !important; }
+${each(' shreddit-post')}, ${each(' shreddit-ad-post')} { width: 100% !important; }
+${each(' [slot="title"]')} { font-size: 1.3em !important; line-height: 1.25 !important; }
+${each(' [class*="line-clamp"]')} { -webkit-line-clamp: 10 !important; line-clamp: 10 !important; }`;
+
+  let topPx = 0;
+
+  // Az utolsó betöltött kártyánál átmenetileg szabad a görgetés, hogy a Reddit
+  // betölthesse a következő adagot. Amint új kártya érkezik, újra kártyánként lapoz.
+  let atEnd = false;
+  let lastCard = null;
+  let endIO = null;
+
+  function setAtEnd(v) {
+    if (v === atEnd) return;
+    atEnd = v;
+    ensureStyle();
+  }
+
+  function watchLastCard() {
+    if (!cardModeActive() || typeof IntersectionObserver === 'undefined') {
+      if (endIO) endIO.disconnect();
+      lastCard = null;
+      setAtEnd(false);
+      return;
+    }
+    const cards = Array.from(document.querySelectorAll(CARD)).filter((c) => !c.classList.contains(HID));
+    const last = cards[cards.length - 1] || null;
+    if (last === lastCard) return;
+    lastCard = last;
+    if (!endIO) {
+      endIO = new IntersectionObserver((entries) => {
+        for (const en of entries) {
+          if (en.target === lastCard) setAtEnd(en.isIntersecting && en.intersectionRatio >= 0.5);
+        }
+      }, { threshold: [0, 0.5, 1] });
+    }
+    endIO.disconnect();
+    setAtEnd(false);
+    if (last) endIO.observe(last);
+  }
+
+  // A kártyák a Reddit felső, odatapadó fejléce alatt kezdődnek. Ezt mérjük meg.
+  function measureTop() {
+    if (!settings.cardMode || !document.body) return;
+    let h = 0;
+    // A saját gombunkat és panelünket kihagyjuk, a Reddit legfelső elemét keressük.
+    const hits = document.elementsFromPoint(Math.round(window.innerWidth / 2), 2);
+    let e = hits.find((x) => !(ui && (x === ui.host || ui.host.contains(x))));
+    while (e && e !== document.body && e !== document.documentElement) {
+      const pos = getComputedStyle(e).position;
+      if (pos === 'fixed' || pos === 'sticky') {
+        h = Math.max(0, Math.round(e.getBoundingClientRect().bottom));
+        break;
+      }
+      e = e.parentElement;
+    }
+    if (h > window.innerHeight / 3) h = 0; // nem fejléc, hanem valami nagy réteg
+    if (h !== topPx) { topPx = h; ensureStyle(); }
+  }
+
+  function cardModeActive() {
+    return !!settings.cardMode && !openedPostId();
+  }
+
   let styleEl = null;
 
   function ensureStyle() {
@@ -383,7 +476,9 @@ body.rpl-scroll-lock:has(shreddit-async-loader[bundlename="app_selector"]) {
       styleEl = document.createElement('style');
       styleEl.id = 'rsz-style';
     }
-    const css = (settings.showHidden ? SHOW_CSS : HIDE_CSS) + (settings.hidePromos ? PROMO_CSS : '');
+    const css = (settings.showHidden ? SHOW_CSS : HIDE_CSS) +
+      (settings.hidePromos ? PROMO_CSS : '') +
+      (cardModeActive() ? cardCss() + `\n:root { --rsz-top: ${topPx}px; }` : '');
     if (styleEl.textContent !== css) styleEl.textContent = css;
     if (!styleEl.isConnected) parent.appendChild(styleEl);
   }
@@ -449,6 +544,7 @@ code { font: 12.5px ui-monospace, Menlo, Consolas, monospace; background: rgba(1
 .row { display: flex; align-items: center; gap: 10px; padding: 10px 0; border-top: 1px solid rgba(127,127,127,.2); }
 .row input { width: 20px; height: 20px; margin: 0; accent-color: #0a84ff; flex: none; }
 .row label { flex: 1; }
+.row.first { border-top: 0; padding-top: 0; margin-bottom: 8px; font-weight: 600; }
 .list-title { font-weight: 600; margin: 12px 0 6px; }
 ul.hidden { list-style: none; margin: 0; padding: 0; font-size: 13.5px; }
 ul.hidden li { padding: 6px 0; border-bottom: 1px solid rgba(127,127,127,.15); }
@@ -505,6 +601,7 @@ ul.hidden .kw { display: inline-block; font-weight: 600; color: #e5484d; margin-
       badgeQueued = false;
       const u = ensureUi();
       if (u) u.count.textContent = String(document.querySelectorAll('.' + HID).length);
+      watchLastCard();
     });
   }
 
@@ -527,6 +624,16 @@ ul.hidden .kw { display: inline-block; font-weight: 600; color: #e5484d; margin-
     show.addEventListener('change', () => {
       settings.showHidden = show.checked;
       applyShowClass();
+      save();
+    });
+
+    const card = mk('input', { type: 'checkbox', id: 'rsz-card' });
+    card.checked = !!settings.cardMode;
+    card.addEventListener('change', () => {
+      settings.cardMode = card.checked;
+      ensureStyle();
+      measureTop();
+      scheduleBadge();
       save();
     });
 
@@ -566,6 +673,7 @@ ul.hidden .kw { display: inline-block; font-weight: 600; color: #e5484d; margin-
         mk('button', { class: 'x', type: 'button', 'aria-label': 'Bezárás', text: '✕', onclick: close }),
       ]),
       mk('div', { class: 'scroll' }, [
+        mk('div', { class: 'row first' }, [card, mk('label', { for: 'rsz-card', text: 'Kártyanézet: egy poszt egy képernyő, felfelé húzással lapozol, mint a TikTokon' })]),
         mk('label', { class: 't', for: 'rsz-list', text: 'Kulcsszavak, soronként egy' }),
         ta,
         mk('ul', { class: 'help' }, [
@@ -607,10 +715,16 @@ ul.hidden .kw { display: inline-block; font-weight: 600; color: #e5484d; margin-
     attributeFilter: ['post-title'],
   });
 
-  const onReady = () => { ensureUi(); rescanAll(); };
+  const onReady = () => { ensureUi(); rescanAll(); measureTop(); };
+  let resizeTimer = 0;
+  window.addEventListener('resize', () => {
+    clearTimeout(resizeTimer);
+    resizeTimer = setTimeout(measureTop, 250);
+  });
+  window.addEventListener('popstate', () => { lastPath = location.pathname; ensureStyle(); });
   if (document.readyState === 'loading') document.addEventListener('DOMContentLoaded', onReady, { once: true });
   else onReady();
-  window.addEventListener('load', rescanAll, { once: true });
+  window.addEventListener('load', () => { rescanAll(); measureTop(); }, { once: true });
 
   // A bővítmény saját tárolója az elsődleges; a helyi másolat csak a gyors induláshoz kell.
   loadGM().then((fromGM) => {
@@ -619,11 +733,12 @@ ul.hidden .kw { display: inline-block; font-weight: 600; color: #e5484d; margin-
     // Nincs mentés a bővítményben (első indítás, vagy nincs GM): a helyi/alap lista megy bele.
     if (!stored) { save(); return; }
     if (stored.list !== settings.list || stored.showHidden !== settings.showHidden ||
-        stored.hidePromos !== settings.hidePromos) {
+        stored.hidePromos !== settings.hidePromos || stored.cardMode !== settings.cardMode) {
       settings = stored;
       matcher = buildMatcher(settings.list);
       applyShowClass();
       rescanAll();
+      if (document.body) measureTop();
       save();
     } else if (gm.changed || local.changed) {
       save();
@@ -631,5 +746,5 @@ ul.hidden .kw { display: inline-block; font-weight: 600; color: #e5484d; margin-
   });
 
   // Teszteléshez és hibakereséshez.
-  window.__redditSzuro = { norm, parseList, buildMatcher, migrate, rescanAll, version: '1.2.0' };
+  window.__redditSzuro = { norm, parseList, buildMatcher, migrate, rescanAll, version: '1.3.0' };
 })();

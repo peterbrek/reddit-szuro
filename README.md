@@ -54,6 +54,12 @@ A kis- és nagybetű és az ékezet nem számít (`putyin` = Putyin). Emiatt egy
 
 **Ellenőrzés:** az **Elrejtett posztok mutatása halványan** pipával a rejtett posztok halványan, piros szaggatott kerettel látszanak, fölöttük a kulcsszóval, ami miatt kiestek. A panel alján ugyanez listában is megvan. Ha valami tévedésből esik ki, vegyél fel rá kivételt (`-szó`), vagy tedd idézőjelbe a kulcsszót.
 
+### Kártyanézet
+
+A panel tetején a **Kártyanézet** kapcsolóval a feed TikTok-szerű lesz: minden poszt egy képernyőnyi kártya, és egy felfelé húzás pontosan a következő posztra lapoz. Az elrejtett posztokat átugorja, a reklámposzt is külön kártyát kap. A poszt megnyitása, a szavazás és a hozzászólások ugyanúgy működnek, mint eddig, a megnyitott poszt oldalán pedig normál a görgetés.
+
+Egy-egy betöltött adag végén egyszer szabadon görgethetsz, amíg a Reddit betölti a következő posztokat, utána újra kártyánként lapoz. A beállítás eszközönként külön tárolódik, így a Macen maradhat a megszokott nézet.
+
 ### App-reklámok
 
 A panelen **A Reddit app-reklámjainak elrejtése** kapcsoló alapból be van kapcsolva. Ez eltünteti a Reddit saját app-ajánlóit: az alsó „Get the Reddit app” sávot, a fejléc „Open app” gombját és a teljes képernyős „Open in app / Continue in browser” ablakot. Ha ezek letiltanák a görgetést, újra engedélyezi.
@@ -114,6 +120,7 @@ A szkript fejlécében benne van a frissítési cím, így a Userscripts és a T
 
 ## Verziók
 
+- **1.3.0** (2026-11-26): kártyanézet, TikTok-szerű lapozással, kapcsolóval a panel tetején.
 - **1.2.0** (2026-11-26): a Reddit app-reklámjainak elrejtése (alsó „Get the Reddit app” sáv, „Open app” gomb, app-választó ablak), kapcsolóval a panelen.
 - **1.1.0** (2026-11-24): `elon` helyett `elon musk` (az `elon` az „elönt”-re is illett), új GTA 6-os sorok. A már elmentett listák maguktól frissülnek.
 - **1.0.0** (2026-11-23): első változat.
