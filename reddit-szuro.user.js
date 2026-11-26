@@ -4,7 +4,7 @@
 // @homepageURL  https://github.com/peterbrek/reddit-szuro
 // @updateURL    https://raw.githubusercontent.com/peterbrek/reddit-szuro/main/reddit-szuro.user.js
 // @downloadURL  https://raw.githubusercontent.com/peterbrek/reddit-szuro/main/reddit-szuro.user.js
-// @version      1.5.1
+// @version      1.5.2
 // @description  Elrejti a Reddit-feedből azokat a posztokat, amelyekben a megadott kulcsszavak szerepelnek.
 // @match        https://www.reddit.com/*
 // @match        https://old.reddit.com/*
@@ -318,7 +318,7 @@ a {
 }
 .sub { display: flex; align-items: center; gap: 8px; margin-bottom: 8px;
   font-size: 15px; font-weight: 600; opacity: .92; text-shadow: 0 1px 2px rgba(0,0,0,.5); }
-.title { margin: 0; font-size: 44px; line-height: 1.12; font-weight: 800; letter-spacing: -.01em;
+.title { margin: 0; font-size: 35px; line-height: 1.12; font-weight: 800; letter-spacing: -.01em;
   text-shadow: 0 2px 6px rgba(0,0,0,.45); overflow-wrap: break-word; hyphens: manual;
   display: -webkit-box; -webkit-box-orient: vertical; -webkit-line-clamp: 6; overflow: hidden; }
 .tag { display: inline-block; padding: 2px 8px; border-radius: 6px; background: #e5484d; font-size: 12px; font-weight: 700; }
@@ -327,9 +327,8 @@ a {
   padding: 72px 18px 18px;
   background: linear-gradient(rgba(0,0,0,0), rgba(0,0,0,.55) 35%, rgba(0,0,0,.88));
 }
-.text { margin: 0 0 12px; font-size: 16px; line-height: 1.45; text-shadow: 0 1px 2px rgba(0,0,0,.4);
-  display: -webkit-box; -webkit-box-orient: vertical; -webkit-line-clamp: 8; overflow: hidden; }
-.textonly .text { font-size: 18px; -webkit-line-clamp: 14; }
+.text { margin: 0 0 12px; font-size: 14px; line-height: 1.45; text-shadow: 0 1px 2px rgba(0,0,0,.4); }
+.textonly .text { font-size: 15px; }
 .meta { display: flex; justify-content: flex-end; }
 .comments { display: inline-flex; align-items: center; gap: 6px; padding: 6px 12px; border-radius: 999px;
   background: rgba(255,255,255,.16); font-size: 15px; font-weight: 600;
@@ -341,6 +340,17 @@ a {
 
   function cleanText(t) {
     return String(t || '').replace(/\s+/g, ' ').trim();
+  }
+
+  // Legfeljebb `max` karakter (a „…”-tal együtt), lehetőleg szóhatáron vágva.
+  const BODY_MAX = 200;
+  function shorten(t, max) {
+    const chars = Array.from(t);
+    if (chars.length <= max) return t;
+    let cut = chars.slice(0, max - 1).join('');
+    const sp = cut.lastIndexOf(' ');
+    if (sp > (max - 1) * 0.6) cut = cut.slice(0, sp);
+    return cut.replace(/[\s.,;:!?\-–—]+$/, '') + '…';
   }
 
   function fromSrcset(ss) {
@@ -445,7 +455,7 @@ a {
 
   function renderCard(p, box) {
     const title = cleanText(p.getAttribute('post-title') || text(p.querySelector('[slot="title"]')));
-    const body = cleanText(text(p.querySelector('[slot="text-body"]')));
+    const body = shorten(cleanText(text(p.querySelector('[slot="text-body"]'))), BODY_MAX);
     const count = formatCount(p.getAttribute('comment-count'));
     const fullLink = p.querySelector('a[slot="full-post-link"]');
     const permalink = p.getAttribute('permalink') || (fullLink ? fullLink.getAttribute('href') : '') || '';
@@ -999,5 +1009,5 @@ ul.hidden .kw { display: inline-block; font-weight: 600; color: #e5484d; margin-
   });
 
   // Teszteléshez és hibakereséshez.
-  window.__redditSzuro = { norm, parseList, buildMatcher, migrate, rescanAll, version: '1.5.1' };
+  window.__redditSzuro = { norm, parseList, buildMatcher, migrate, rescanAll, version: '1.5.2' };
 })();

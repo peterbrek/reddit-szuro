@@ -62,7 +62,7 @@ A kártyán csak ennyi van:
 
 - **felül** a subreddit neve, alatta nagy betűkkel a poszt címe (legfeljebb hat sor, a hosszabb „…”-tal végződik);
 - **a háttérben, kitöltve** a poszt képe vagy videója (a videó némítva, ismétlődve megy, és csak akkor játszik, amikor a kártya látszik);
-- **alul** a poszt szövege, alatta sötét színátmenettel, hogy olvasható legyen;
+- **alul** a poszt szövege kisebb betűvel, legfeljebb 200 karakter (a hosszabbat szóhatáron levágja, „…”-tal), alatta sötét színátmenettel, hogy olvasható legyen;
 - **jobb alul** a hozzászólások száma.
 
 A kártyára koppintva a poszt oldalára jutsz.
@@ -131,6 +131,7 @@ A szkript fejlécében benne van a frissítési cím, így a Userscripts és a T
 
 ## Verziók
 
+- **1.5.2** (2026-11-26): a cím a korábbi méret 80%-a, a szöveg kisebb és legfeljebb 200 karakter.
 - **1.5.1** (2026-11-26): kétszer akkora cím a kártyán, fölötte a subreddit neve.
 - **1.5.0** (2026-11-26): kártyanézetben eltűnik a Reddit fejléce, keresője és fülsora, csak a kártyák maradnak.
 - **1.4.0** (2026-11-26): új kártyák: cím felül, kép vagy videó kitöltve a háttérben, szöveg alul sötét átmeneten, hozzászólásszám; koppintásra a poszthoz visz.
