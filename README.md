@@ -56,7 +56,7 @@ A kis- és nagybetű és az ékezet nem számít (`putyin` = Putyin). Emiatt egy
 
 ### Kártyanézet
 
-A panelen, a többi kapcsoló között a **Kártyanézet** kapcsolóval a feed TikTok-szerű lesz: minden poszt egy képernyőnyi kártya, és egy felfelé húzás pontosan a következő posztra lapoz.
+A panelen, a többi kapcsoló között a **Kártyanézet** kapcsolóval a feed TikTok-szerű lesz: minden poszt egy képernyőnyi kártya. Húzás közben a kártya követi az ujjadat; elengedéskor egy határozott húzás vagy gyors pöccintés a következő (lefelé húzva az előző) kártyára lép, egy rövid húzás visszaugrik. Macen a görgő vagy a trackpad egy mozdulata, illetve a le/fel nyíl, PageDown/PageUp és a szóköz lapoz egy kártyát.
 
 A kártyán csak ennyi van:
 
@@ -69,11 +69,11 @@ A kártyára koppintva a poszt oldalára jutsz.
 
 Kártyanézetben a Reddit fejléce (menü, logó, értesítések), a kereső és a „For You / Following” fülsor eltűnik, csak a kártyák maradnak. Ezekhez a 🙈 panelen kapcsold ki a kártyanézetet. A legutóbb kiválasztott fül marad érvényben. Kép nélküli posztnál a háttér egy, a subreddithez igazodó színátmenet. Az apró bélyegképeket nem nyújtja szét, az NSFW- és spoilerképeket elmosva, címkével mutatja. Ha a Safari nem tudja lejátszani a videót, a videó előnézeti képe lesz a háttér.
 
-Egyszerre csak egy kártya látszik: a kártya mindig a ténylegesen látható magasságot tölti ki (a Safari összecsukódó sávjaival együtt), és az a kártya, amelyikből csak egy kis csík látszik, elhalványul, így a következő kártya teteje az átlátszó eszköztár mögött sem bukkan elő. Húzás közben a beúszó kártya azonnal megjelenik.
+Egyszerre csak egy kártya látszik: a kártya kitölti a látható magasságot, és az a kártya, amelyikből csak egy kis csík látszik (például az átlátszó Safari-eszköztár mögött), rejtve marad. Húzás közben a beúszó kártya hamar megjelenik.
 
 A kártyák csak fel-le lapozhatók: oldalra nem húzhatók, és a kép vagy a link sem fogható meg. (A képernyő legszéléről indított oldalra húzás a Safari saját vissza/előre mozdulata, azt egy weboldal nem tudja letiltani.)
 
-Az elrejtett posztokat átugorja. A reklámposztok is külön kártyát kapnak, de azokat a Reddit rajzolja. A megnyitott poszt oldalán normál a görgetés. Egy-egy betöltött adag végén egyszer szabadon görgethetsz, amíg a Reddit betölti a következő posztokat, utána újra kártyánként lapoz. A beállítás eszközönként külön tárolódik.
+Az elrejtett posztokat átugorja. A reklámposztok is külön kártyát kapnak, de azokat a Reddit rajzolja. A megnyitott poszt oldalán normál a görgetés. A betöltött posztok végén a lapozás lejjebb gördül, hogy a Reddit betöltse a következő adagot, és amint megjöttek, magától az elsőre lép. A beállítás eszközönként külön tárolódik.
 
 ### App-reklámok
 
@@ -125,7 +125,7 @@ Eszközönként külön, a Userscripts saját tárolójában és a reddit.com he
 
 ## Megjegyzés a Safarihoz (fejlesztéshez)
 
-A kártyanézet a lap saját görgetését lapoztatja (`scroll-snap`). A Safari (WebKit) nem ugrik be, ha a kártyán vagy bármelyik szülőelemén (a `body`-t is beleértve) az `overflow` nem `visible`, és iOS-en akadozik, ha görgetés közben stílus íródik át. Ezért a kártyák kerekítése `clip-path`, az oldalra mozdulást a kártya szélessége és a `touch-action: pan-y` akadályozza meg, a feed utáni elemeket pedig külön vágjuk a képernyő szélességére.
+A kártyanézet lapozását a szkript maga végzi (érintés, görgő és billentyűzet figyelése, majd animált `scrollTo`), nem a böngésző CSS `scroll-snap`-je: iOS Safariban az egész oldalas beugró lapozás megbízhatatlan (dinamikus magasság, a gyökérelemre tett snap és a görgetés közbeni stílusváltás egyaránt elrontja). A kártyákon `touch-action: none` van, a koppintás így is megnyitja a posztot. A html/body `overflow`-jához ne nyúlj.
 
 ## Korlátok
 
@@ -139,6 +139,7 @@ A szkript fejlécében benne van a frissítési cím, így a Userscripts és a T
 
 ## Verziók
 
+- **1.7.0** (2026-11-26): saját lapozás a Safari beugró görgetése helyett: húzás közben követi az ujjat, elengedve egy kártyát lép; görgő és billentyűzet is.
 - **1.6.1** (2026-11-26): javítva, hogy iPhone-on a kártyák újra beugranak (az 1.5.3–1.6.0 egy Safari-hiba miatt szabad görgetést okozott).
 - **1.6.0** (2026-11-26): egyszerre csak egy kártya látszik, a következő teteje nem lóg be.
 - **1.5.3** (2026-11-26): kártyanézetben csak fel-le lehet lapozni, oldalra nem mozdul az oldal.

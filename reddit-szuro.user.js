@@ -4,7 +4,7 @@
 // @homepageURL  https://github.com/peterbrek/reddit-szuro
 // @updateURL    https://raw.githubusercontent.com/peterbrek/reddit-szuro/main/reddit-szuro.user.js
 // @downloadURL  https://raw.githubusercontent.com/peterbrek/reddit-szuro/main/reddit-szuro.user.js
-// @version      1.6.1
+// @version      1.7.0
 // @description  Elrejti a Reddit-feedből azokat a posztokat, amelyekben a megadott kulcsszavak szerepelnek.
 // @match        https://www.reddit.com/*
 // @match        https://old.reddit.com/*
@@ -306,7 +306,7 @@ a, img, video { -webkit-user-drag: none; user-drag: none; }
 img, video { pointer-events: none; }
 a {
   position: absolute; inset: 0; display: block; overflow: hidden;
-  touch-action: pan-y; -webkit-user-select: none; user-select: none;
+  touch-action: none; -webkit-user-select: none; user-select: none;
   color: #fff; text-decoration: none; background: #111;
   font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
   -webkit-tap-highlight-color: transparent;
@@ -623,15 +623,12 @@ body.rpl-scroll-lock:has(shreddit-async-loader[bundlename="app_selector"]) {
   const CARD = POSTCARD + ', article:has(shreddit-ad-post), shreddit-feed > shreddit-ad-post';
   const each = (suffix) => CARD.split(', ').map((c) => c + suffix).join(', ');
   const cardCss = () => `
-html { scroll-snap-type: y ${atEnd ? 'proximity' : 'mandatory'} !important; scroll-padding-top: var(--rsz-top, 0px) !important; }
-shreddit-feed { scroll-snap-align: end; }
+html { scroll-behavior: auto !important; }
 .${OFF} { display: none !important; }
-/* Csak függőleges lapozás. A html/body overflow-jához és a kártyák overflow-jához szándékosan
-   nem nyúlunk: a Safari (WebKit) az ilyen elemet tekintené a lapozás tartójának, és megszűnne
-   a beugrás. A kártya pontos szélessége és a pan-y érintés elég ahhoz, hogy oldalra ne mozduljon. */
-html { overscroll-behavior-x: none !important; }
+/* A lapozást a szűrő maga végzi (lásd: Lapozás), ezért a kártyákon a böngésző saját
+   görgetése és nagyítása ki van kapcsolva; a koppintás (a poszt megnyitása) működik. */
 .${TAME} { max-width: 100vw !important; overflow-x: clip !important; }
-${CARD} { width: auto !important; max-width: none !important; touch-action: pan-y; touch-action: pan-y pinch-zoom; }
+${CARD} { width: auto !important; max-width: none !important; touch-action: none; }
 ${CARD} {
   box-sizing: border-box !important;
   /* Mindig a ténylegesen látható magasság: a Safari összecsukódó sávjaival együtt változik. */
@@ -643,7 +640,6 @@ ${CARD} {
   border-radius: 22px !important;
   background: rgba(127,127,127,.08) !important;
   border: 1px solid rgba(127,127,127,.18) !important;
-  scroll-snap-align: start; scroll-snap-stop: always; scroll-margin-top: 8px;
 }
 ${POSTCARD} { position: relative !important; padding: 0 !important; background: #111 !important; border: 0 !important; }
 ${POSTCARD} > .rsz-card-host { display: block !important; }
@@ -662,7 +658,8 @@ ${each('[data-rsz-out]')} { opacity: 0 !important; }`;
   // Egyszerre egy kártya: amelyik kártyából csak egy kis csík látszik (pl. a következő teteje
   // a Safari átlátszó eszköztára mögött), az elhalványul. A böngésző saját láthatóság-figyelője
   // jelzi, így görgetés közben semmilyen stílus nem íródik át (az iOS-en megakasztaná a lapozást).
-  const OUT_RATIO = 0.25;
+  // A képernyő alsó 15%-a nem számít: az ott kilógó kártyacsík (pl. az átlátszó Safari-
+  // eszköztár mögött) rejtve marad, húzás közben viszont a beúszó kártya hamar megjelenik.
   let cardIO = null;
   let observed = new WeakSet();
 
@@ -677,10 +674,10 @@ ${each('[data-rsz-out]')} { opacity: 0 !important; }`;
       observed = new WeakSet();
       cardIO = new IntersectionObserver((entries) => {
         for (const en of entries) {
-          const out = !en.isIntersecting || en.intersectionRatio < OUT_RATIO;
+          const out = !en.isIntersecting;
           if (out !== en.target.hasAttribute('data-rsz-out')) en.target.toggleAttribute('data-rsz-out', out);
         }
-      }, { threshold: [0, 0.1, OUT_RATIO, 0.5, 1] });
+      }, { threshold: [0], rootMargin: '0px 0px -15% 0px' });
     }
     document.querySelectorAll(CARD).forEach((c) => {
       if (observed.has(c)) return;
@@ -722,40 +719,166 @@ ${each('[data-rsz-out]')} { opacity: 0 !important; }`;
     return changed;
   }
 
-  // Az utolsó betöltött kártyánál átmenetileg szabad a görgetés, hogy a Reddit
-  // betölthesse a következő adagot. Amint új kártya érkezik, újra kártyánként lapoz.
-  let atEnd = false;
-  let lastCard = null;
-  let endIO = null;
+  // ---------------------------------------------------------------------------
+  // Lapozás. Nem a böngésző scroll-snap-jére bízzuk: iOS Safariban az egész oldalas
+  // beugró lapozás megbízhatatlan. Húzáskor a lap az ujjat követi, elengedéskor egy
+  // határozott húzás vagy pöccintés egy kártyát lép, a rövid húzás visszaugrik.
+  // ---------------------------------------------------------------------------
 
-  function setAtEnd(v) {
-    if (v === atEnd) return;
-    atEnd = v;
-    ensureStyle();
+  let anim = 0;
+  let pendingFrom = -1;
+  let pendingTimer = 0;
+
+  function pageCards() {
+    return Array.from(document.querySelectorAll(CARD)).filter((c) => c.offsetHeight > 0);
   }
 
-  function watchLastCard() {
-    if (!cardModeActive() || typeof IntersectionObserver === 'undefined') {
-      if (endIO) endIO.disconnect();
-      lastCard = null;
-      setAtEnd(false);
+  function cardY(c) {
+    return Math.max(0, Math.round(c.getBoundingClientRect().top + window.scrollY - 8 - topPx));
+  }
+
+  function nearestIndex(cards, y) {
+    let best = 0;
+    let bestD = Infinity;
+    cards.forEach((c, i) => {
+      const d = Math.abs(cardY(c) - y);
+      if (d < bestD) { bestD = d; best = i; }
+    });
+    return best;
+  }
+
+  function maxScroll() {
+    return Math.max(0, document.documentElement.scrollHeight - window.innerHeight);
+  }
+
+  function stopAnim() {
+    if (anim) cancelAnimationFrame(anim);
+    anim = 0;
+  }
+
+  function scrollToY(y, dur) {
+    stopAnim();
+    const from = window.scrollY;
+    const to = Math.max(0, Math.min(Math.round(y), maxScroll()));
+    const dist = to - from;
+    if (!dist) return;
+    const t0 = performance.now();
+    const step = (now) => {
+      const t = Math.min(1, (now - t0) / dur);
+      const e = 1 - Math.pow(1 - t, 3);
+      window.scrollTo(0, from + dist * e);
+      anim = t < 1 ? requestAnimationFrame(step) : 0;
+    };
+    anim = requestAnimationFrame(step);
+  }
+
+  // dir: +1 következő, -1 előző, 0 a legközelebbire vissza; fromY: ahonnan a mozdulat indult.
+  function go(dir, fromY) {
+    const cards = pageCards();
+    if (!cards.length) return;
+    const i = nearestIndex(cards, fromY === undefined ? window.scrollY : fromY);
+    const j = i + dir;
+    if (j < 0) { scrollToY(0, 260); return; }
+    if (j >= cards.length) {
+      // A végén lejjebb gördülünk, hogy a Reddit betöltse a következő adagot;
+      // amint megjönnek az új kártyák, magától az elsőre lapozunk.
+      pendingFrom = cards.length;
+      clearTimeout(pendingTimer);
+      pendingTimer = setTimeout(() => { pendingFrom = -1; }, 10000);
+      scrollToY(maxScroll(), 320);
       return;
     }
-    const cards = Array.from(document.querySelectorAll(CARD)).filter((c) => !c.classList.contains(HID));
-    const last = cards[cards.length - 1] || null;
-    if (last === lastCard) return;
-    lastCard = last;
-    if (!endIO) {
-      endIO = new IntersectionObserver((entries) => {
-        for (const en of entries) {
-          if (en.target === lastCard) setAtEnd(en.isIntersecting && en.intersectionRatio >= 0.5);
-        }
-      }, { threshold: [0, 0.5, 1] });
-    }
-    endIO.disconnect();
-    setAtEnd(false);
-    if (last) endIO.observe(last);
+    scrollToY(cardY(cards[j]), dir ? 320 : 220);
   }
+
+  function checkPending() {
+    if (pendingFrom < 0 || !cardModeActive()) return;
+    const cards = pageCards();
+    if (cards.length > pendingFrom) {
+      const k = pendingFrom;
+      pendingFrom = -1;
+      scrollToY(cardY(cards[k]), 320);
+    }
+  }
+
+  function fromOurUi(e) {
+    return !!(ui && e.composedPath && e.composedPath().includes(ui.host));
+  }
+
+  let touch = null;
+
+  document.addEventListener('touchstart', (e) => {
+    touch = null;
+    if (!cardModeActive() || e.touches.length !== 1 || fromOurUi(e)) return;
+    stopAnim();
+    const t = e.touches[0];
+    touch = { x: t.clientX, y: t.clientY, startY: window.scrollY, moved: false, pts: [{ y: t.clientY, t: e.timeStamp }] };
+  }, { passive: true });
+
+  document.addEventListener('touchmove', (e) => {
+    if (!touch) return;
+    if (e.touches.length !== 1) { touch = null; go(0); return; }
+    if (e.cancelable) e.preventDefault();
+    const t = e.touches[0];
+    const dy = touch.y - t.clientY;
+    if (!touch.moved && Math.abs(dy) < 6 && Math.abs(touch.x - t.clientX) < 6) return;
+    touch.moved = true;
+    window.scrollTo(0, Math.max(0, Math.min(touch.startY + dy, maxScroll())));
+    touch.pts.push({ y: t.clientY, t: e.timeStamp });
+    if (touch.pts.length > 5) touch.pts.shift();
+  }, { passive: false });
+
+  const endTouch = () => {
+    const tt = touch;
+    touch = null;
+    if (!tt || !tt.moved) return; // koppintás: a kártya linkje nyílik meg
+    const a = tt.pts[0];
+    const b = tt.pts[tt.pts.length - 1];
+    const v = (a.y - b.y) / Math.max(1, b.t - a.t); // px/ms, pozitív = felfelé húzás
+    const dy = tt.y - b.y;
+    const limit = window.innerHeight * 0.15;
+    if (dy > limit || v > 0.35) go(1, tt.startY);
+    else if (dy < -limit || v < -0.35) go(-1, tt.startY);
+    else go(0, tt.startY);
+  };
+  document.addEventListener('touchend', endTouch, { passive: true });
+  document.addEventListener('touchcancel', endTouch, { passive: true });
+
+  // Egérgörgő / trackpad: egy mozdulat = egy kártya (a lendület miatti utánfutást elnyeljük).
+  let wheelSum = 0;
+  let wheelLast = 0;
+  let wheelLocked = false;
+  window.addEventListener('wheel', (e) => {
+    if (!cardModeActive() || e.ctrlKey || fromOurUi(e)) return;
+    e.preventDefault();
+    const now = performance.now();
+    const gap = now - wheelLast;
+    wheelLast = now;
+    if (wheelLocked) {
+      if (gap < 220) return;
+      wheelLocked = false;
+    }
+    if (gap > 300) wheelSum = 0;
+    wheelSum += e.deltaY * (e.deltaMode === 1 ? 16 : e.deltaMode === 2 ? window.innerHeight : 1);
+    if (Math.abs(wheelSum) >= 40) {
+      go(wheelSum > 0 ? 1 : -1);
+      wheelSum = 0;
+      wheelLocked = true;
+    }
+  }, { passive: false });
+
+  // Billentyűzet: le/fel nyíl, PageDown/PageUp, szóköz (Shifttel vissza).
+  window.addEventListener('keydown', (e) => {
+    if (!cardModeActive() || e.defaultPrevented || e.altKey || e.ctrlKey || e.metaKey || fromOurUi(e)) return;
+    const el = e.composedPath ? e.composedPath()[0] : e.target;
+    if (el && (el.isContentEditable || /^(INPUT|TEXTAREA|SELECT)$/.test(el.tagName || ''))) return;
+    let dir = 0;
+    if (e.key === 'ArrowDown' || e.key === 'PageDown' || (e.key === ' ' && !e.shiftKey)) dir = 1;
+    else if (e.key === 'ArrowUp' || e.key === 'PageUp' || (e.key === ' ' && e.shiftKey)) dir = -1;
+    if (!dir) return;
+    e.preventDefault();
+    go(dir);
+  }, true);
 
   // A kártyák a Reddit felső, odatapadó fejléce alatt kezdődnek. Ezt mérjük meg.
   function measureTop() {
@@ -915,7 +1038,7 @@ ul.hidden .kw { display: inline-block; font-weight: 600; color: #e5484d; margin-
       const u = ensureUi();
       if (u) u.count.textContent = String(document.querySelectorAll('.' + HID).length);
       if (markOffpath()) measureTop();
-      watchLastCard();
+      checkPending();
       watchCards();
     });
   }
@@ -1034,7 +1157,7 @@ ul.hidden .kw { display: inline-block; font-weight: 600; color: #e5484d; margin-
   let resizeTimer = 0;
   window.addEventListener('resize', () => {
     clearTimeout(resizeTimer);
-    resizeTimer = setTimeout(measureTop, 250);
+    resizeTimer = setTimeout(() => { measureTop(); if (cardModeActive()) go(0); }, 250);
   });
   window.addEventListener('popstate', () => { lastPath = location.pathname; ensureStyle(); });
   if (document.readyState === 'loading') document.addEventListener('DOMContentLoaded', onReady, { once: true });
@@ -1061,5 +1184,5 @@ ul.hidden .kw { display: inline-block; font-weight: 600; color: #e5484d; margin-
   });
 
   // Teszteléshez és hibakereséshez.
-  window.__redditSzuro = { norm, parseList, buildMatcher, migrate, rescanAll, version: '1.6.1' };
+  window.__redditSzuro = { norm, parseList, buildMatcher, migrate, rescanAll, version: '1.7.0' };
 })();
