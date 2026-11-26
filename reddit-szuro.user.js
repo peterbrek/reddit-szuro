@@ -4,7 +4,7 @@
 // @homepageURL  https://github.com/peterbrek/reddit-szuro
 // @updateURL    https://raw.githubusercontent.com/peterbrek/reddit-szuro/main/reddit-szuro.user.js
 // @downloadURL  https://raw.githubusercontent.com/peterbrek/reddit-szuro/main/reddit-szuro.user.js
-// @version      1.4.0
+// @version      1.5.0
 // @description  Elrejti a Reddit-feedből azokat a posztokat, amelyekben a megadott kulcsszavak szerepelnek.
 // @match        https://www.reddit.com/*
 // @match        https://old.reddit.com/*
@@ -598,12 +598,13 @@ body.rpl-scroll-lock:has(shreddit-async-loader[bundlename="app_selector"]) {
   // Reddit-poszt láthatatlanul alatta marad, így a végtelen görgetés és a betöltés nem sérül.
   // A reklámposzt is kártya lesz (a Reddit rajzolja), különben a lapozás megakadna előtte.
   const POSTCARD = 'article:has(shreddit-post)';
+  const OFF = 'rsz-offpath';
   const CARD = POSTCARD + ', article:has(shreddit-ad-post), shreddit-feed > shreddit-ad-post';
   const each = (suffix) => CARD.split(', ').map((c) => c + suffix).join(', ');
   const cardCss = () => `
 html { scroll-snap-type: y ${atEnd ? 'proximity' : 'mandatory'} !important; scroll-padding-top: var(--rsz-top, 0px) !important; }
-body { scroll-snap-align: start; }
 shreddit-feed { scroll-snap-align: end; }
+.${OFF} { display: none !important; }
 ${CARD} {
   box-sizing: border-box !important;
   height: calc(100svh - var(--rsz-top, 0px) - 16px) !important;
@@ -626,6 +627,32 @@ ${each(' + hr')} { display: none !important; }
 ${each(' shreddit-ad-post')} { width: 100% !important; }`;
 
   let topPx = 0;
+
+  // Kártyanézetben csak a kártyák maradnak: a feed előtt álló elemeket (fejléc, kereső,
+  // fülsor, bal oldali menü) elrejtjük. A feed utáni elemekhez nem nyúlunk, mert köztük van
+  // a további posztokat betöltő elem és a Reddit felugró ablakai is.
+  function markOffpath() {
+    const feed = cardModeActive() &&
+      (document.querySelector('shreddit-feed') || (document.querySelector(POSTCARD) || {}).parentElement);
+    const keep = new Set();
+    if (feed && document.body && document.body.contains(feed)) {
+      for (let e = feed; e && e !== document.body; e = e.parentElement) {
+        for (let sib = e.previousElementSibling; sib; sib = sib.previousElementSibling) {
+          if (ui && sib === ui.host) continue;
+          if (/^(SCRIPT|STYLE|LINK|META|TEMPLATE|NOSCRIPT)$/.test(sib.tagName)) continue;
+          keep.add(sib);
+        }
+      }
+    }
+    let changed = false;
+    document.querySelectorAll('.' + OFF).forEach((x) => {
+      if (!keep.has(x)) { x.classList.remove(OFF); changed = true; }
+    });
+    keep.forEach((x) => {
+      if (!x.classList.contains(OFF)) { x.classList.add(OFF); changed = true; }
+    });
+    return changed;
+  }
 
   // Az utolsó betöltött kártyánál átmenetileg szabad a görgetés, hogy a Reddit
   // betölthesse a következő adagot. Amint új kártya érkezik, újra kártyánként lapoz.
@@ -665,6 +692,7 @@ ${each(' shreddit-ad-post')} { width: 100% !important; }`;
   // A kártyák a Reddit felső, odatapadó fejléce alatt kezdődnek. Ezt mérjük meg.
   function measureTop() {
     if (!settings.cardMode || !document.body) return;
+    markOffpath();
     let h = 0;
     // A saját gombunkat és panelünket kihagyjuk, a Reddit legfelső elemét keressük.
     const hits = document.elementsFromPoint(Math.round(window.innerWidth / 2), 2);
@@ -818,6 +846,7 @@ ul.hidden .kw { display: inline-block; font-weight: 600; color: #e5484d; margin-
       badgeQueued = false;
       const u = ensureUi();
       if (u) u.count.textContent = String(document.querySelectorAll('.' + HID).length);
+      if (markOffpath()) measureTop();
       watchLastCard();
     });
   }
@@ -963,5 +992,5 @@ ul.hidden .kw { display: inline-block; font-weight: 600; color: #e5484d; margin-
   });
 
   // Teszteléshez és hibakereséshez.
-  window.__redditSzuro = { norm, parseList, buildMatcher, migrate, rescanAll, version: '1.4.0' };
+  window.__redditSzuro = { norm, parseList, buildMatcher, migrate, rescanAll, version: '1.5.0' };
 })();

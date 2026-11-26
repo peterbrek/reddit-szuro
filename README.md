@@ -65,7 +65,9 @@ A kártyán csak ennyi van:
 - **alul** a poszt szövege, alatta sötét színátmenettel, hogy olvasható legyen;
 - **jobb alul** a hozzászólások száma.
 
-A kártyára koppintva a poszt oldalára jutsz. Kép nélküli posztnál a háttér egy, a subreddithez igazodó színátmenet. Az apró bélyegképeket nem nyújtja szét, az NSFW- és spoilerképeket elmosva, címkével mutatja. Ha a Safari nem tudja lejátszani a videót, a videó előnézeti képe lesz a háttér.
+A kártyára koppintva a poszt oldalára jutsz.
+
+Kártyanézetben a Reddit fejléce (menü, logó, értesítések), a kereső és a „For You / Following” fülsor eltűnik, csak a kártyák maradnak. Ezekhez a 🙈 panelen kapcsold ki a kártyanézetet. A legutóbb kiválasztott fül marad érvényben. Kép nélküli posztnál a háttér egy, a subreddithez igazodó színátmenet. Az apró bélyegképeket nem nyújtja szét, az NSFW- és spoilerképeket elmosva, címkével mutatja. Ha a Safari nem tudja lejátszani a videót, a videó előnézeti képe lesz a háttér.
 
 Az elrejtett posztokat átugorja. A reklámposztok is külön kártyát kapnak, de azokat a Reddit rajzolja. A megnyitott poszt oldalán normál a görgetés. Egy-egy betöltött adag végén egyszer szabadon görgethetsz, amíg a Reddit betölti a következő posztokat, utána újra kártyánként lapoz. A beállítás eszközönként külön tárolódik.
 
@@ -129,6 +131,7 @@ A szkript fejlécében benne van a frissítési cím, így a Userscripts és a T
 
 ## Verziók
 
+- **1.5.0** (2026-11-26): kártyanézetben eltűnik a Reddit fejléce, keresője és fülsora, csak a kártyák maradnak.
 - **1.4.0** (2026-11-26): új kártyák: cím felül, kép vagy videó kitöltve a háttérben, szöveg alul sötét átmeneten, hozzászólásszám; koppintásra a poszthoz visz.
 - **1.3.1** (2026-11-26): a kártyanézet kapcsolója a többi kapcsoló mellé került.
 - **1.3.0** (2026-11-26): kártyanézet, TikTok-szerű lapozással.
