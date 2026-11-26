@@ -54,6 +54,12 @@ A kis- és nagybetű és az ékezet nem számít (`putyin` = Putyin). Emiatt egy
 
 **Ellenőrzés:** az **Elrejtett posztok mutatása halványan** pipával a rejtett posztok halványan, piros szaggatott kerettel látszanak, fölöttük a kulcsszóval, ami miatt kiestek. A panel alján ugyanez listában is megvan. Ha valami tévedésből esik ki, vegyél fel rá kivételt (`-szó`), vagy tedd idézőjelbe a kulcsszót.
 
+### App-reklámok
+
+A panelen **A Reddit app-reklámjainak elrejtése** kapcsoló alapból be van kapcsolva. Ez eltünteti a Reddit saját app-ajánlóit: az alsó „Get the Reddit app” sávot, a fejléc „Open app” gombját és a teljes képernyős „Open in app / Continue in browser” ablakot. Ha ezek letiltanák a görgetést, újra engedélyezi.
+
+A felső, magyar nyelvű „Megnyitás a Reddit appban” sávot nem a Reddit rajzolja, hanem a Safari (Smart App Banner), mert a Reddit app telepítve van. A szűrő kiveszi az oldalból azt a jelzést, amiből a Safari ezt a sávot készíti, de telepített appnál a Safari általában így is megjeleníti. Biztosan csak akkor tűnik el, ha törlöd a Reddit appot.
+
 ### Alap lista
 
 ```
@@ -108,5 +114,6 @@ A szkript fejlécében benne van a frissítési cím, így a Userscripts és a T
 
 ## Verziók
 
+- **1.2.0** (2026-11-26): a Reddit app-reklámjainak elrejtése (alsó „Get the Reddit app” sáv, „Open app” gomb, app-választó ablak), kapcsolóval a panelen.
 - **1.1.0** (2026-11-24): `elon` helyett `elon musk` (az `elon` az „elönt”-re is illett), új GTA 6-os sorok. A már elmentett listák maguktól frissülnek.
 - **1.0.0** (2026-11-23): első változat.

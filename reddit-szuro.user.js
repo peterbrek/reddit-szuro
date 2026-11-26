@@ -4,7 +4,7 @@
 // @homepageURL  https://github.com/peterbrek/reddit-szuro
 // @updateURL    https://raw.githubusercontent.com/peterbrek/reddit-szuro/main/reddit-szuro.user.js
 // @downloadURL  https://raw.githubusercontent.com/peterbrek/reddit-szuro/main/reddit-szuro.user.js
-// @version      1.1.0
+// @version      1.2.0
 // @description  Elrejti a Reddit-feedből azokat a posztokat, amelyekben a megadott kulcsszavak szerepelnek.
 // @match        https://www.reddit.com/*
 // @match        https://old.reddit.com/*
@@ -64,7 +64,7 @@
   // a saját sorok megmaradnak.
   const LIST_VERSION = 2;
 
-  const DEFAULTS = { list: DEFAULT_LIST, showHidden: false, listVersion: LIST_VERSION };
+  const DEFAULTS = { list: DEFAULT_LIST, showHidden: false, hidePromos: true, listVersion: LIST_VERSION };
 
   const hasGM = typeof GM !== 'undefined' && GM && typeof GM.getValue === 'function';
 
@@ -73,7 +73,12 @@
     try {
       const obj = typeof raw === 'string' ? JSON.parse(raw) : raw;
       if (obj && typeof obj.list === 'string') {
-        return { list: obj.list, showHidden: !!obj.showHidden, listVersion: obj.listVersion || 1 };
+        return {
+          list: obj.list,
+          showHidden: !!obj.showHidden,
+          hidePromos: obj.hidePromos !== false,
+          listVersion: obj.listVersion || 1,
+        };
       }
     } catch (e) { /* sérült adat: marad az alap */ }
     return null;
@@ -93,7 +98,7 @@
         while (lines.length && !lines[lines.length - 1].trim()) lines.pop();
         lines = lines.concat([''], GTA_LINES());
       }
-      s = { list: lines.join('\n'), showHidden: s.showHidden, listVersion: 2 };
+      s = Object.assign({}, s, { list: lines.join('\n'), listVersion: 2 });
       changed = true;
     }
     return { s, changed };
@@ -112,6 +117,7 @@
     const raw = JSON.stringify({
       list: settings.list,
       showHidden: settings.showHidden,
+      hidePromos: settings.hidePromos !== false,
       listVersion: settings.listVersion || LIST_VERSION,
     });
     try { localStorage.setItem(STORE_KEY, raw); } catch (e) { /* privát mód */ }
@@ -308,6 +314,7 @@
       if (host) found.add(outermost(host));
       for (const n of m.addedNodes) {
         if (n.nodeType !== 1) continue;
+        if (n.tagName === 'META') { killSmartBanner(n); continue; }
         if (n.matches(POST_SEL)) found.add(outermost(n));
         if (n.firstElementChild) n.querySelectorAll(POST_SEL).forEach((x) => found.add(outermost(x)));
       }
@@ -332,6 +339,41 @@
   color: #e5484d;
 }`;
 
+  // A Reddit saját „Get the Reddit app” / „Open in app” elemei. Csak app-reklámot tartalmaznak.
+  const PROMO_CSS = `
+shreddit-async-loader[paint-group*="xpromo"],
+shreddit-async-loader[bundlename*="xpromo"],
+shreddit-async-loader[bundlename="top_button"],
+shreddit-async-loader[bundlename="app_selector"],
+xpromo-bottom-bar, xpromo-app-selector, xpromo-new-app-selector, xpromo-bottom-sheet,
+#xpromo-bottom-sheet, .configured-xpromo-bottom-sheet, .configured-xpromo,
+.XPromoPopup, .XPromoPopupRpl, .XPromoBottomBar, .XPromoInFeed,
+.TopNav__promoButton, .TopNav__useAppButton, #get-app,
+slot[name="use-app"], [slot="use-app"] { display: none !important; }
+body.scroll-disabled, body.scroll-is-blocked,
+body.rpl-scroll-lock:has(.configured-xpromo),
+body.rpl-scroll-lock:has(shreddit-async-loader[bundlename="app_selector"]) {
+  overflow: auto !important; position: static !important; height: auto !important;
+}`;
+
+  // A Safari felső „Megnyitás a Reddit appban” sávja ebből a meta-címkéből készül.
+  // Ha elég korán kikerül, a Safari nem mindig rajzolja ki (telepített appnál ritkán sikerül).
+  function killSmartBanner(n) {
+    if (!settings.hidePromos) return;
+    const name = (n.getAttribute('name') || n.getAttribute('property') || '').toLowerCase();
+    if (name === 'apple-itunes-app') n.remove();
+  }
+
+  // A Reddit ezekből tudja, hogy nemrég bezártad-e az app-ajánlót.
+  function quietPromos() {
+    if (!settings.hidePromos) return;
+    try {
+      const now = new Date().toString();
+      localStorage.setItem('xpromo-consolidation', now);
+      localStorage.setItem('bannerLastClosed', now);
+    } catch (e) { /* privát mód */ }
+  }
+
   let styleEl = null;
 
   function ensureStyle() {
@@ -341,7 +383,7 @@
       styleEl = document.createElement('style');
       styleEl.id = 'rsz-style';
     }
-    const css = settings.showHidden ? SHOW_CSS : HIDE_CSS;
+    const css = (settings.showHidden ? SHOW_CSS : HIDE_CSS) + (settings.hidePromos ? PROMO_CSS : '');
     if (styleEl.textContent !== css) styleEl.textContent = css;
     if (!styleEl.isConnected) parent.appendChild(styleEl);
   }
@@ -488,6 +530,15 @@ ul.hidden .kw { display: inline-block; font-weight: 600; color: #e5484d; margin-
       save();
     });
 
+    const promo = mk('input', { type: 'checkbox', id: 'rsz-promo' });
+    promo.checked = settings.hidePromos !== false;
+    promo.addEventListener('change', () => {
+      settings.hidePromos = promo.checked;
+      ensureStyle();
+      quietPromos();
+      save();
+    });
+
     const items = hiddenOnPage();
     const list = items.length
       ? mk('ul', { class: 'hidden' }, items.slice(0, 40).map((it) =>
@@ -525,6 +576,7 @@ ul.hidden .kw { display: inline-block; font-weight: 600; color: #e5484d; margin-
           mk('li', null, ['A cím, a flair, a poszt szövege és a link címe számít. Kis- és nagybetű, ékezet nem.']),
         ]),
         mk('div', { class: 'row' }, [show, mk('label', { for: 'rsz-show', text: 'Elrejtett posztok mutatása halványan, ellenőrzéshez' })]),
+        mk('div', { class: 'row' }, [promo, mk('label', { for: 'rsz-promo', text: 'A Reddit app-reklámjainak elrejtése (pl. „Get the Reddit app” sáv)' })]),
         mk('div', { class: 'list-title', text: 'Ezen az oldalon elrejtve: ' + items.length }),
         list,
       ]),
@@ -546,6 +598,8 @@ ul.hidden .kw { display: inline-block; font-weight: 600; color: #e5484d; margin-
   // A dokumentumot magát figyeljük, így akkor is működik, ha a szkript
   // még a <html> elem létrejötte előtt indul.
   ensureStyle();
+  quietPromos();
+  document.querySelectorAll('meta').forEach(killSmartBanner);
   observer.observe(document, {
     childList: true,
     subtree: true,
@@ -564,7 +618,8 @@ ul.hidden .kw { display: inline-block; font-weight: 600; color: #e5484d; margin-
     const stored = gm.s;
     // Nincs mentés a bővítményben (első indítás, vagy nincs GM): a helyi/alap lista megy bele.
     if (!stored) { save(); return; }
-    if (stored.list !== settings.list || stored.showHidden !== settings.showHidden) {
+    if (stored.list !== settings.list || stored.showHidden !== settings.showHidden ||
+        stored.hidePromos !== settings.hidePromos) {
       settings = stored;
       matcher = buildMatcher(settings.list);
       applyShowClass();
@@ -576,5 +631,5 @@ ul.hidden .kw { display: inline-block; font-weight: 600; color: #e5484d; margin-
   });
 
   // Teszteléshez és hibakereséshez.
-  window.__redditSzuro = { norm, parseList, buildMatcher, migrate, rescanAll, version: '1.1.0' };
+  window.__redditSzuro = { norm, parseList, buildMatcher, migrate, rescanAll, version: '1.2.0' };
 })();
