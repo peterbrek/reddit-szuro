@@ -4,7 +4,7 @@
 // @homepageURL  https://github.com/peterbrek/reddit-szuro
 // @updateURL    https://raw.githubusercontent.com/peterbrek/reddit-szuro/main/reddit-szuro.user.js
 // @downloadURL  https://raw.githubusercontent.com/peterbrek/reddit-szuro/main/reddit-szuro.user.js
-// @version      1.3.1
+// @version      1.4.0
 // @description  Elrejti a Reddit-feedből azokat a posztokat, amelyekben a megadott kulcsszavak szerepelnek.
 // @match        https://www.reddit.com/*
 // @match        https://old.reddit.com/*
@@ -291,6 +291,215 @@
       box.removeAttribute('data-rsz');
       box.removeAttribute('data-rsz-title');
     }
+    if (el.tagName === 'SHREDDIT-POST' && box !== el && info && cardModeActive()) renderCard(el, box);
+    else removeCard(box);
+  }
+
+  // ---------------------------------------------------------------------------
+  // Saját posztkártya a kártyanézethez
+  // ---------------------------------------------------------------------------
+
+  const CARD_UI_CSS = `
+:host { all: initial; position: absolute; inset: 0; z-index: 3; display: block; border-radius: 22px; overflow: hidden; }
+* { box-sizing: border-box; }
+a {
+  position: absolute; inset: 0; display: block; overflow: hidden;
+  color: #fff; text-decoration: none; background: #111;
+  font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
+  -webkit-tap-highlight-color: transparent;
+}
+.bg { position: absolute; inset: 0; width: 100%; height: 100%; object-fit: cover; display: block; }
+.blank { position: absolute; inset: 0; background: linear-gradient(160deg, hsl(var(--h) 45% 30%), hsl(calc(var(--h) + 50) 40% 10%)); }
+.blur .bg { filter: blur(28px) brightness(.8); transform: scale(1.15); }
+.top {
+  position: absolute; left: 0; right: 0; top: 0;
+  padding: 18px 18px 56px;
+  background: linear-gradient(rgba(0,0,0,.75), rgba(0,0,0,.35) 60%, rgba(0,0,0,0));
+}
+.title { margin: 0; font-size: 22px; line-height: 1.25; font-weight: 700; text-shadow: 0 1px 3px rgba(0,0,0,.5);
+  display: -webkit-box; -webkit-box-orient: vertical; -webkit-line-clamp: 5; overflow: hidden; }
+.tag { display: inline-block; margin-bottom: 8px; padding: 2px 8px; border-radius: 6px; background: #e5484d; font-size: 12px; font-weight: 700; }
+.bottom {
+  position: absolute; left: 0; right: 0; bottom: 0;
+  padding: 72px 18px 18px;
+  background: linear-gradient(rgba(0,0,0,0), rgba(0,0,0,.55) 35%, rgba(0,0,0,.88));
+}
+.text { margin: 0 0 12px; font-size: 16px; line-height: 1.45; text-shadow: 0 1px 2px rgba(0,0,0,.4);
+  display: -webkit-box; -webkit-box-orient: vertical; -webkit-line-clamp: 8; overflow: hidden; }
+.textonly .text { font-size: 18px; -webkit-line-clamp: 14; }
+.meta { display: flex; justify-content: flex-end; }
+.comments { display: inline-flex; align-items: center; gap: 6px; padding: 6px 12px; border-radius: 999px;
+  background: rgba(255,255,255,.16); font-size: 15px; font-weight: 600;
+  -webkit-backdrop-filter: blur(8px); backdrop-filter: blur(8px); }
+.comments svg { width: 18px; height: 18px; }
+@media (pointer: coarse) { .bottom { padding-bottom: 76px; } }`;
+
+  const COMMENT_ICON = '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linejoin="round"><path d="M12 3c5 0 9 3.6 9 8s-4 8-9 8c-1.2 0-2.3-.2-3.4-.5L3 20l1.6-4.2C3.6 14.4 3 12.8 3 11c0-4.4 4-8 9-8z"/></svg>';
+
+  function cleanText(t) {
+    return String(t || '').replace(/\s+/g, ' ').trim();
+  }
+
+  function fromSrcset(ss) {
+    if (!ss) return '';
+    const items = ss.split(/,\s+/).map((part) => {
+      const bits = part.trim().split(/\s+/);
+      return { url: bits[0], w: parseInt(bits[1], 10) || 0 };
+    }).filter((x) => x.url);
+    if (!items.length) return '';
+    items.sort((a, b) => a.w - b.w);
+    const good = items.find((x) => x.w >= 1000);
+    return (good || items[items.length - 1]).url;
+  }
+
+  const BAD_IMG = /styles\.redditmedia\.com|redditstatic\.com|\/avatars?\/|communityIcon|snoovatar|emoji|\.svg(\?|$)/i;
+  const GOOD_HOST = /(^|\/\/)(preview|i|external-preview|external-i)\.redd\.it\//i;
+
+  // A poszt képe vagy videója. Előnyben a Reddit előnézeti képe (kisebb, mint az eredeti).
+  function findMedia(p) {
+    const player = p.querySelector('shreddit-player-2, shreddit-player');
+    if (player) {
+      const src = player.getAttribute('src') || '';
+      const poster = player.getAttribute('poster') || player.getAttribute('preview') || '';
+      if (src || poster) return { type: 'video', src, poster };
+    }
+    let best = '';
+    let bestArea = -1;
+    p.querySelectorAll('img, faceplate-img[src]').forEach((img) => {
+      const url = fromSrcset(img.getAttribute('srcset')) || img.currentSrc || img.getAttribute('src') || img.getAttribute('data-src') || '';
+      if (!url || url.startsWith('data:') || BAD_IMG.test(url)) return;
+      const w = img.naturalWidth || parseInt(img.getAttribute('width'), 10) || 0;
+      const h = img.naturalHeight || parseInt(img.getAttribute('height'), 10) || 0;
+      const area = w * h;
+      if (area && area < 300 * 300) return; // ikon, avatar, apró bélyegkép: kitöltve csak elmosódna
+      if (!area && !GOOD_HOST.test(url)) return;
+      const score = area || 1;
+      if (score > bestArea) { bestArea = score; best = url; }
+    });
+    if (best) return { type: 'image', src: best };
+    const href = p.getAttribute('content-href') || '';
+    if (/\.(jpe?g|png|gif|webp)(\?|$)/i.test(href) || /\/\/i\.redd\.it\//i.test(href)) return { type: 'image', src: href };
+    return null;
+  }
+
+  function isSensitive(p) {
+    return ['nsfw', 'spoiler', 'is-nsfw', 'is-spoiler'].some((a) => p.hasAttribute(a) && p.getAttribute(a) !== 'false') ||
+      !!p.querySelector('shreddit-blurred-container');
+  }
+
+  function formatCount(n) {
+    const v = parseInt(n, 10);
+    if (!isFinite(v) || v < 0) return '';
+    return v.toLocaleString('hu-HU');
+  }
+
+  function hueOf(s) {
+    let h = 0;
+    for (let i = 0; i < s.length; i++) h = (h * 31 + s.charCodeAt(i)) % 360;
+    return h;
+  }
+
+  function canPlay(src) {
+    if (!src) return false;
+    const v = document.createElement('video');
+    if (/\.m3u8(\?|$)/i.test(src)) return !!v.canPlayType('application/vnd.apple.mpegurl');
+    if (/\.mpd(\?|$)/i.test(src)) return false;
+    return true;
+  }
+
+  // A videó csak akkor megy, amikor a kártyája látszik.
+  let mediaIO = null;
+  function watchVideo(v) {
+    if (typeof IntersectionObserver === 'undefined') return;
+    if (!mediaIO) {
+      mediaIO = new IntersectionObserver((entries) => {
+        for (const en of entries) {
+          const vid = en.target;
+          if (en.isIntersecting && en.intersectionRatio >= 0.6) {
+            if (!vid.getAttribute('src') && vid.dataset.src) vid.setAttribute('src', vid.dataset.src);
+            const pr = vid.play();
+            if (pr && pr.catch) pr.catch(() => {});
+          } else {
+            vid.pause();
+          }
+        }
+      }, { threshold: [0, 0.6] });
+    }
+    mediaIO.observe(v);
+  }
+
+  function removeCard(box) {
+    const host = box && box.querySelector(':scope > .rsz-card-host');
+    if (!host) return;
+    if (host.shadowRoot) {
+      host.shadowRoot.querySelectorAll('video').forEach((v) => {
+        v.pause();
+        if (mediaIO) mediaIO.unobserve(v);
+      });
+    }
+    host.remove();
+  }
+
+  function renderCard(p, box) {
+    const title = cleanText(p.getAttribute('post-title') || text(p.querySelector('[slot="title"]')));
+    const body = cleanText(text(p.querySelector('[slot="text-body"]')));
+    const count = formatCount(p.getAttribute('comment-count'));
+    const fullLink = p.querySelector('a[slot="full-post-link"]');
+    const permalink = p.getAttribute('permalink') || (fullLink ? fullLink.getAttribute('href') : '') || '';
+    const media = findMedia(p);
+    const sensitive = isSensitive(p);
+    const sub = p.getAttribute('subreddit-name') || '';
+    const sig = JSON.stringify([title, body, count, permalink, media, sensitive]);
+
+    let host = box.querySelector(':scope > .rsz-card-host');
+    if (host && host.dataset.sig === sig) return;
+    if (host) removeCard(box);
+
+    host = document.createElement('div');
+    host.className = 'rsz-card-host';
+    host.dataset.sig = sig;
+    const root = host.attachShadow({ mode: 'open' });
+    root.appendChild(mk('style', { text: CARD_UI_CSS }));
+
+    const a = mk('a', { href: permalink ? new URL(permalink, location.origin).href : '#', 'aria-label': title });
+    if (sensitive) a.classList.add('blur');
+    if (!media) {
+      a.classList.add('textonly');
+      const blank = mk('div', { class: 'blank' });
+      blank.style.setProperty('--h', String(hueOf(sub || title)));
+      a.appendChild(blank);
+    } else if (media.type === 'video' && canPlay(media.src) && !sensitive) {
+      const v = mk('video', { class: 'bg', muted: '', loop: '', playsinline: '', 'webkit-playsinline': '', preload: 'none' });
+      v.muted = true;
+      v.dataset.src = media.src;
+      if (media.poster) v.setAttribute('poster', media.poster);
+      a.appendChild(v);
+      watchVideo(v);
+    } else {
+      const src = media.type === 'video' ? media.poster : media.src;
+      if (src) a.appendChild(mk('img', { class: 'bg', src, alt: '', loading: 'lazy', decoding: 'async' }));
+      else a.appendChild(mk('div', { class: 'blank' }));
+    }
+
+    const top = mk('div', { class: 'top' });
+    if (sensitive) top.appendChild(mk('div', { class: 'tag', text: p.hasAttribute('spoiler') || p.hasAttribute('is-spoiler') ? 'Spoiler' : 'NSFW' }));
+    top.appendChild(mk('h2', { class: 'title', text: title }));
+    a.appendChild(top);
+
+    const bottom = mk('div', { class: 'bottom' });
+    if (body) bottom.appendChild(mk('p', { class: 'text', text: body }));
+    const meta = mk('div', { class: 'meta' });
+    if (count) {
+      const c = mk('span', { class: 'comments', 'aria-label': count + ' hozzászólás' });
+      c.innerHTML = COMMENT_ICON;
+      c.appendChild(document.createTextNode(count));
+      meta.appendChild(c);
+    }
+    bottom.appendChild(meta);
+    a.appendChild(bottom);
+
+    root.appendChild(a);
+    box.appendChild(host);
   }
 
   function rescanAll() {
@@ -338,8 +547,9 @@
   // ---------------------------------------------------------------------------
 
   // A két mód közt a stíluslap szövege vált, így nem függünk a Reddit <html> osztályaitól.
-  const HIDE_CSS = `html .${HID}, html .${HID} + hr { display: none !important; }`;
-  const SHOW_CSS = `
+  const BASE_CSS = `.rsz-card-host { display: none; }\n`;
+  const HIDE_CSS = BASE_CSS + `html .${HID}, html .${HID} + hr { display: none !important; }`;
+  const SHOW_CSS = BASE_CSS + `
 .${HID} { opacity: .45; outline: 2px dashed #e5484d; outline-offset: -2px; }
 .${HID}::before {
   content: "Elrejtve · " attr(data-rsz);
@@ -384,9 +594,11 @@ body.rpl-scroll-lock:has(shreddit-async-loader[bundlename="app_selector"]) {
   }
 
   // Kártyanézet: minden poszt egy képernyőnyi kártya, a lapozás poszttól posztig ugrik.
-  // Csak CSS, a Reddit oldalszerkezetéhez nem nyúl, így a végtelen görgetés is megmarad.
-  // A reklámposzt is kártya lesz, különben a lapozás megakadna előtte.
-  const CARD = 'article:has(shreddit-post), article:has(shreddit-ad-post), shreddit-feed > shreddit-ad-post';
+  // A posztkártyát a szűrő maga rajzolja (cím, kép/videó, szöveg, hozzászólásszám); az eredeti
+  // Reddit-poszt láthatatlanul alatta marad, így a végtelen görgetés és a betöltés nem sérül.
+  // A reklámposzt is kártya lesz (a Reddit rajzolja), különben a lapozás megakadna előtte.
+  const POSTCARD = 'article:has(shreddit-post)';
+  const CARD = POSTCARD + ', article:has(shreddit-ad-post), shreddit-feed > shreddit-ad-post';
   const each = (suffix) => CARD.split(', ').map((c) => c + suffix).join(', ');
   const cardCss = () => `
 html { scroll-snap-type: y ${atEnd ? 'proximity' : 'mandatory'} !important; scroll-padding-top: var(--rsz-top, 0px) !important; }
@@ -394,18 +606,24 @@ body { scroll-snap-align: start; }
 shreddit-feed { scroll-snap-align: end; }
 ${CARD} {
   box-sizing: border-box !important;
-  min-height: calc(100svh - var(--rsz-top, 0px) - 16px) !important;
+  height: calc(100svh - var(--rsz-top, 0px) - 16px) !important;
   margin: 8px !important; padding: 16px 4px !important;
   display: flex !important; flex-direction: column !important; justify-content: center !important;
+  overflow: hidden !important;
   border-radius: 22px !important;
   background: rgba(127,127,127,.08) !important;
   border: 1px solid rgba(127,127,127,.18) !important;
   scroll-snap-align: start; scroll-snap-stop: always; scroll-margin-top: 8px;
 }
+${POSTCARD} { position: relative !important; padding: 0 !important; background: #111 !important; border: 0 !important; }
+${POSTCARD} > .rsz-card-host { display: block !important; }
+${POSTCARD} shreddit-post {
+  position: absolute !important; inset: 0 !important; overflow: hidden !important;
+  opacity: 0 !important; pointer-events: none !important;
+}
+${POSTCARD} shreddit-player, ${POSTCARD} shreddit-player-2 { display: none !important; }
 ${each(' + hr')} { display: none !important; }
-${each(' shreddit-post')}, ${each(' shreddit-ad-post')} { width: 100% !important; }
-${each(' [slot="title"]')} { font-size: 1.3em !important; line-height: 1.25 !important; }
-${each(' [class*="line-clamp"]')} { -webkit-line-clamp: 10 !important; line-clamp: 10 !important; }`;
+${each(' shreddit-ad-post')} { width: 100% !important; }`;
 
   let topPx = 0;
 
@@ -632,7 +850,7 @@ ul.hidden .kw { display: inline-block; font-weight: 600; color: #e5484d; margin-
       settings.cardMode = card.checked;
       ensureStyle();
       measureTop();
-      scheduleBadge();
+      rescanAll();
       save();
     });
 
@@ -745,5 +963,5 @@ ul.hidden .kw { display: inline-block; font-weight: 600; color: #e5484d; margin-
   });
 
   // Teszteléshez és hibakereséshez.
-  window.__redditSzuro = { norm, parseList, buildMatcher, migrate, rescanAll, version: '1.3.1' };
+  window.__redditSzuro = { norm, parseList, buildMatcher, migrate, rescanAll, version: '1.4.0' };
 })();

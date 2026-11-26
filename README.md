@@ -56,9 +56,18 @@ A kis- és nagybetű és az ékezet nem számít (`putyin` = Putyin). Emiatt egy
 
 ### Kártyanézet
 
-A panelen, a többi kapcsoló között a **Kártyanézet** kapcsolóval a feed TikTok-szerű lesz: minden poszt egy képernyőnyi kártya, és egy felfelé húzás pontosan a következő posztra lapoz. Az elrejtett posztokat átugorja, a reklámposzt is külön kártyát kap. A poszt megnyitása, a szavazás és a hozzászólások ugyanúgy működnek, mint eddig, a megnyitott poszt oldalán pedig normál a görgetés.
+A panelen, a többi kapcsoló között a **Kártyanézet** kapcsolóval a feed TikTok-szerű lesz: minden poszt egy képernyőnyi kártya, és egy felfelé húzás pontosan a következő posztra lapoz.
 
-Egy-egy betöltött adag végén egyszer szabadon görgethetsz, amíg a Reddit betölti a következő posztokat, utána újra kártyánként lapoz. A beállítás eszközönként külön tárolódik, így a Macen maradhat a megszokott nézet.
+A kártyán csak ennyi van:
+
+- **felül** a poszt címe;
+- **a háttérben, kitöltve** a poszt képe vagy videója (a videó némítva, ismétlődve megy, és csak akkor játszik, amikor a kártya látszik);
+- **alul** a poszt szövege, alatta sötét színátmenettel, hogy olvasható legyen;
+- **jobb alul** a hozzászólások száma.
+
+A kártyára koppintva a poszt oldalára jutsz. Kép nélküli posztnál a háttér egy, a subreddithez igazodó színátmenet. Az apró bélyegképeket nem nyújtja szét, az NSFW- és spoilerképeket elmosva, címkével mutatja. Ha a Safari nem tudja lejátszani a videót, a videó előnézeti képe lesz a háttér.
+
+Az elrejtett posztokat átugorja. A reklámposztok is külön kártyát kapnak, de azokat a Reddit rajzolja. A megnyitott poszt oldalán normál a görgetés. Egy-egy betöltött adag végén egyszer szabadon görgethetsz, amíg a Reddit betölti a következő posztokat, utána újra kártyánként lapoz. A beállítás eszközönként külön tárolódik.
 
 ### App-reklámok
 
@@ -120,6 +129,7 @@ A szkript fejlécében benne van a frissítési cím, így a Userscripts és a T
 
 ## Verziók
 
+- **1.4.0** (2026-11-26): új kártyák: cím felül, kép vagy videó kitöltve a háttérben, szöveg alul sötét átmeneten, hozzászólásszám; koppintásra a poszthoz visz.
 - **1.3.1** (2026-11-26): a kártyanézet kapcsolója a többi kapcsoló mellé került.
 - **1.3.0** (2026-11-26): kártyanézet, TikTok-szerű lapozással.
 - **1.2.0** (2026-11-26): a Reddit app-reklámjainak elrejtése (alsó „Get the Reddit app” sáv, „Open app” gomb, app-választó ablak), kapcsolóval a panelen.
