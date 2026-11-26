@@ -56,7 +56,7 @@ A kis- és nagybetű és az ékezet nem számít (`putyin` = Putyin). Emiatt egy
 
 ### Kártyanézet
 
-A panel tetején a **Kártyanézet** kapcsolóval a feed TikTok-szerű lesz: minden poszt egy képernyőnyi kártya, és egy felfelé húzás pontosan a következő posztra lapoz. Az elrejtett posztokat átugorja, a reklámposzt is külön kártyát kap. A poszt megnyitása, a szavazás és a hozzászólások ugyanúgy működnek, mint eddig, a megnyitott poszt oldalán pedig normál a görgetés.
+A panelen, a többi kapcsoló között a **Kártyanézet** kapcsolóval a feed TikTok-szerű lesz: minden poszt egy képernyőnyi kártya, és egy felfelé húzás pontosan a következő posztra lapoz. Az elrejtett posztokat átugorja, a reklámposzt is külön kártyát kap. A poszt megnyitása, a szavazás és a hozzászólások ugyanúgy működnek, mint eddig, a megnyitott poszt oldalán pedig normál a görgetés.
 
 Egy-egy betöltött adag végén egyszer szabadon görgethetsz, amíg a Reddit betölti a következő posztokat, utána újra kártyánként lapoz. A beállítás eszközönként külön tárolódik, így a Macen maradhat a megszokott nézet.
 
@@ -120,7 +120,8 @@ A szkript fejlécében benne van a frissítési cím, így a Userscripts és a T
 
 ## Verziók
 
-- **1.3.0** (2026-11-26): kártyanézet, TikTok-szerű lapozással, kapcsolóval a panel tetején.
+- **1.3.1** (2026-11-26): a kártyanézet kapcsolója a többi kapcsoló mellé került.
+- **1.3.0** (2026-11-26): kártyanézet, TikTok-szerű lapozással.
 - **1.2.0** (2026-11-26): a Reddit app-reklámjainak elrejtése (alsó „Get the Reddit app” sáv, „Open app” gomb, app-választó ablak), kapcsolóval a panelen.
 - **1.1.0** (2026-11-24): `elon` helyett `elon musk` (az `elon` az „elönt”-re is illett), új GTA 6-os sorok. A már elmentett listák maguktól frissülnek.
 - **1.0.0** (2026-11-23): első változat.

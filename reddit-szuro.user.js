@@ -4,7 +4,7 @@
 // @homepageURL  https://github.com/peterbrek/reddit-szuro
 // @updateURL    https://raw.githubusercontent.com/peterbrek/reddit-szuro/main/reddit-szuro.user.js
 // @downloadURL  https://raw.githubusercontent.com/peterbrek/reddit-szuro/main/reddit-szuro.user.js
-// @version      1.3.0
+// @version      1.3.1
 // @description  Elrejti a Reddit-feedből azokat a posztokat, amelyekben a megadott kulcsszavak szerepelnek.
 // @match        https://www.reddit.com/*
 // @match        https://old.reddit.com/*
@@ -544,7 +544,6 @@ code { font: 12.5px ui-monospace, Menlo, Consolas, monospace; background: rgba(1
 .row { display: flex; align-items: center; gap: 10px; padding: 10px 0; border-top: 1px solid rgba(127,127,127,.2); }
 .row input { width: 20px; height: 20px; margin: 0; accent-color: #0a84ff; flex: none; }
 .row label { flex: 1; }
-.row.first { border-top: 0; padding-top: 0; margin-bottom: 8px; font-weight: 600; }
 .list-title { font-weight: 600; margin: 12px 0 6px; }
 ul.hidden { list-style: none; margin: 0; padding: 0; font-size: 13.5px; }
 ul.hidden li { padding: 6px 0; border-bottom: 1px solid rgba(127,127,127,.15); }
@@ -673,7 +672,6 @@ ul.hidden .kw { display: inline-block; font-weight: 600; color: #e5484d; margin-
         mk('button', { class: 'x', type: 'button', 'aria-label': 'Bezárás', text: '✕', onclick: close }),
       ]),
       mk('div', { class: 'scroll' }, [
-        mk('div', { class: 'row first' }, [card, mk('label', { for: 'rsz-card', text: 'Kártyanézet: egy poszt egy képernyő, felfelé húzással lapozol, mint a TikTokon' })]),
         mk('label', { class: 't', for: 'rsz-list', text: 'Kulcsszavak, soronként egy' }),
         ta,
         mk('ul', { class: 'help' }, [
@@ -683,6 +681,7 @@ ul.hidden .kw { display: inline-block; font-weight: 600; color: #e5484d; margin-
           mk('li', null, ['Egész subreddit: ', mk('code', { text: 'r/politics' }), '. Megjegyzés: ', mk('code', { text: '# …' }), '.']),
           mk('li', null, ['A cím, a flair, a poszt szövege és a link címe számít. Kis- és nagybetű, ékezet nem.']),
         ]),
+        mk('div', { class: 'row' }, [card, mk('label', { for: 'rsz-card', text: 'Kártyanézet: egy poszt egy képernyő, felfelé húzással lapozol, mint a TikTokon' })]),
         mk('div', { class: 'row' }, [show, mk('label', { for: 'rsz-show', text: 'Elrejtett posztok mutatása halványan, ellenőrzéshez' })]),
         mk('div', { class: 'row' }, [promo, mk('label', { for: 'rsz-promo', text: 'A Reddit app-reklámjainak elrejtése (pl. „Get the Reddit app” sáv)' })]),
         mk('div', { class: 'list-title', text: 'Ezen az oldalon elrejtve: ' + items.length }),
@@ -746,5 +745,5 @@ ul.hidden .kw { display: inline-block; font-weight: 600; color: #e5484d; margin-
   });
 
   // Teszteléshez és hibakereséshez.
-  window.__redditSzuro = { norm, parseList, buildMatcher, migrate, rescanAll, version: '1.3.0' };
+  window.__redditSzuro = { norm, parseList, buildMatcher, migrate, rescanAll, version: '1.3.1' };
 })();
