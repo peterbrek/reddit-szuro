@@ -4,7 +4,7 @@
 // @homepageURL  https://github.com/peterbrek/reddit-szuro
 // @updateURL    https://raw.githubusercontent.com/peterbrek/reddit-szuro/main/reddit-szuro.user.js
 // @downloadURL  https://raw.githubusercontent.com/peterbrek/reddit-szuro/main/reddit-szuro.user.js
-// @version      1.6.0
+// @version      1.6.1
 // @description  Elrejti a Reddit-feedből azokat a posztokat, amelyekben a megadott kulcsszavak szerepelnek.
 // @match        https://www.reddit.com/*
 // @match        https://old.reddit.com/*
@@ -619,15 +619,18 @@ body.rpl-scroll-lock:has(shreddit-async-loader[bundlename="app_selector"]) {
   // A reklámposzt is kártya lesz (a Reddit rajzolja), különben a lapozás megakadna előtte.
   const POSTCARD = 'article:has(shreddit-post)';
   const OFF = 'rsz-offpath';
+  const TAME = 'rsz-tame';
   const CARD = POSTCARD + ', article:has(shreddit-ad-post), shreddit-feed > shreddit-ad-post';
   const each = (suffix) => CARD.split(', ').map((c) => c + suffix).join(', ');
   const cardCss = () => `
 html { scroll-snap-type: y ${atEnd ? 'proximity' : 'mandatory'} !important; scroll-padding-top: var(--rsz-top, 0px) !important; }
 shreddit-feed { scroll-snap-align: end; }
 .${OFF} { display: none !important; }
-/* Csak függőleges lapozás: nincs vízszintes görgetés, a kártyát nem lehet oldalra húzni. */
-html { overflow-x: hidden !important; overscroll-behavior-x: none !important; }
-body { overflow-x: clip !important; }
+/* Csak függőleges lapozás. A html/body overflow-jához és a kártyák overflow-jához szándékosan
+   nem nyúlunk: a Safari (WebKit) az ilyen elemet tekintené a lapozás tartójának, és megszűnne
+   a beugrás. A kártya pontos szélessége és a pan-y érintés elég ahhoz, hogy oldalra ne mozduljon. */
+html { overscroll-behavior-x: none !important; }
+.${TAME} { max-width: 100vw !important; overflow-x: clip !important; }
 ${CARD} { width: auto !important; max-width: none !important; touch-action: pan-y; touch-action: pan-y pinch-zoom; }
 ${CARD} {
   box-sizing: border-box !important;
@@ -636,7 +639,7 @@ ${CARD} {
   height: calc(100dvh - var(--rsz-top, 0px) - 16px) !important;
   margin: 8px !important; padding: 16px 4px !important;
   display: flex !important; flex-direction: column !important; justify-content: center !important;
-  overflow: hidden !important;
+  clip-path: inset(0 round 22px);
   border-radius: 22px !important;
   background: rgba(127,127,127,.08) !important;
   border: 1px solid rgba(127,127,127,.18) !important;
@@ -651,42 +654,39 @@ ${POSTCARD} shreddit-post {
 ${POSTCARD} shreddit-player, ${POSTCARD} shreddit-player-2 { display: none !important; }
 ${each(' + hr')} { display: none !important; }
 ${each(' shreddit-ad-post')} { width: 100% !important; }
-${!moving && hasCurrent ? `${each(':not([data-rsz-cur])')} { visibility: hidden !important; }` : ''}`;
+${CARD} { transition: opacity .15s ease; }
+${each('[data-rsz-out]')} { opacity: 0 !important; }`;
 
   let topPx = 0;
 
-  // Nyugalmi helyzetben csak az aktuális kártya látszik, így a következő kártya teteje
-  // a Safari átlátszó eszköztára mögött sem bukkan elő. Lapozás közben minden kártya látszik.
-  let moving = true;
-  let hasCurrent = false;
-  let settleTimer = 0;
+  // Egyszerre egy kártya: amelyik kártyából csak egy kis csík látszik (pl. a következő teteje
+  // a Safari átlátszó eszköztára mögött), az elhalványul. A böngésző saját láthatóság-figyelője
+  // jelzi, így görgetés közben semmilyen stílus nem íródik át (az iOS-en megakasztaná a lapozást).
+  const OUT_RATIO = 0.25;
+  let cardIO = null;
+  let observed = new WeakSet();
 
-  function markCurrent() {
-    let cur = null;
-    if (cardModeActive()) {
-      const mid = window.innerHeight / 2;
-      for (const c of document.querySelectorAll(CARD)) {
-        const r = c.getBoundingClientRect();
-        if (r.height && r.top <= mid && r.bottom >= mid) { cur = c; break; }
-      }
+  function watchCards() {
+    if (typeof IntersectionObserver === 'undefined') return;
+    if (!cardModeActive()) {
+      if (cardIO) { cardIO.disconnect(); cardIO = null; }
+      document.querySelectorAll('[data-rsz-out]').forEach((e) => e.removeAttribute('data-rsz-out'));
+      return;
     }
-    document.querySelectorAll('[data-rsz-cur]').forEach((e) => { if (e !== cur) e.removeAttribute('data-rsz-cur'); });
-    if (cur && !cur.hasAttribute('data-rsz-cur')) cur.setAttribute('data-rsz-cur', '');
-    hasCurrent = !!cur;
-  }
-
-  function settle() {
-    clearTimeout(settleTimer);
-    moving = false;
-    markCurrent();
-    ensureStyle();
-  }
-
-  function onScroll() {
-    if (!cardModeActive()) return;
-    if (!moving) { moving = true; ensureStyle(); }
-    clearTimeout(settleTimer);
-    settleTimer = setTimeout(settle, 160);
+    if (!cardIO) {
+      observed = new WeakSet();
+      cardIO = new IntersectionObserver((entries) => {
+        for (const en of entries) {
+          const out = !en.isIntersecting || en.intersectionRatio < OUT_RATIO;
+          if (out !== en.target.hasAttribute('data-rsz-out')) en.target.toggleAttribute('data-rsz-out', out);
+        }
+      }, { threshold: [0, 0.1, OUT_RATIO, 0.5, 1] });
+    }
+    document.querySelectorAll(CARD).forEach((c) => {
+      if (observed.has(c)) return;
+      observed.add(c);
+      cardIO.observe(c);
+    });
   }
 
   // Kártyanézetben csak a kártyák maradnak: a feed előtt álló elemeket (fejléc, kereső,
@@ -696,15 +696,22 @@ ${!moving && hasCurrent ? `${each(':not([data-rsz-cur])')} { visibility: hidden 
     const feed = cardModeActive() &&
       (document.querySelector('shreddit-feed') || (document.querySelector(POSTCARD) || {}).parentElement);
     const keep = new Set();
+    const tame = new Set();
+    const skip = (x) => (ui && x === ui.host) || /^(SCRIPT|STYLE|LINK|META|TEMPLATE|NOSCRIPT)$/.test(x.tagName);
     if (feed && document.body && document.body.contains(feed)) {
       for (let e = feed; e && e !== document.body; e = e.parentElement) {
         for (let sib = e.previousElementSibling; sib; sib = sib.previousElementSibling) {
-          if (ui && sib === ui.host) continue;
-          if (/^(SCRIPT|STYLE|LINK|META|TEMPLATE|NOSCRIPT)$/.test(sib.tagName)) continue;
-          keep.add(sib);
+          if (!skip(sib)) keep.add(sib);
+        }
+        // A feed utáni elemek maradnak, csak nem lehetnek szélesebbek a képernyőnél
+        // (különben az oldal oldalra is elmozdítható lenne).
+        for (let sib = e.nextElementSibling; sib; sib = sib.nextElementSibling) {
+          if (!skip(sib)) tame.add(sib);
         }
       }
     }
+    document.querySelectorAll('.' + TAME).forEach((x) => { if (!tame.has(x)) x.classList.remove(TAME); });
+    tame.forEach((x) => { if (!x.classList.contains(TAME)) x.classList.add(TAME); });
     let changed = false;
     document.querySelectorAll('.' + OFF).forEach((x) => {
       if (!keep.has(x)) { x.classList.remove(OFF); changed = true; }
@@ -909,8 +916,7 @@ ul.hidden .kw { display: inline-block; font-weight: 600; color: #e5484d; margin-
       if (u) u.count.textContent = String(document.querySelectorAll('.' + HID).length);
       if (markOffpath()) measureTop();
       watchLastCard();
-      // Ha a Reddit újrarajzolta az aktuális kártyát, újra kijelöljük, nehogy eltűnjön.
-      if (!moving && hasCurrent && !document.querySelector('[data-rsz-cur]')) settle();
+      watchCards();
     });
   }
 
@@ -940,11 +946,9 @@ ul.hidden .kw { display: inline-block; font-weight: 600; color: #e5484d; margin-
     card.checked = !!settings.cardMode;
     card.addEventListener('change', () => {
       settings.cardMode = card.checked;
-      moving = true;
       ensureStyle();
       measureTop();
       rescanAll();
-      setTimeout(settle, 300);
       save();
     });
 
@@ -1026,18 +1030,16 @@ ul.hidden .kw { display: inline-block; font-weight: 600; color: #e5484d; margin-
     attributeFilter: ['post-title'],
   });
 
-  const onReady = () => { ensureUi(); rescanAll(); measureTop(); setTimeout(settle, 300); };
-  window.addEventListener('scroll', onScroll, { passive: true });
-  window.addEventListener('scrollend', () => { if (cardModeActive()) settle(); });
+  const onReady = () => { ensureUi(); rescanAll(); measureTop(); };
   let resizeTimer = 0;
   window.addEventListener('resize', () => {
     clearTimeout(resizeTimer);
-    resizeTimer = setTimeout(() => { measureTop(); settle(); }, 250);
+    resizeTimer = setTimeout(measureTop, 250);
   });
   window.addEventListener('popstate', () => { lastPath = location.pathname; ensureStyle(); });
   if (document.readyState === 'loading') document.addEventListener('DOMContentLoaded', onReady, { once: true });
   else onReady();
-  window.addEventListener('load', () => { rescanAll(); measureTop(); settle(); }, { once: true });
+  window.addEventListener('load', () => { rescanAll(); measureTop(); }, { once: true });
 
   // A bővítmény saját tárolója az elsődleges; a helyi másolat csak a gyors induláshoz kell.
   loadGM().then((fromGM) => {
@@ -1051,7 +1053,7 @@ ul.hidden .kw { display: inline-block; font-weight: 600; color: #e5484d; margin-
       matcher = buildMatcher(settings.list);
       applyShowClass();
       rescanAll();
-      if (document.body) { measureTop(); setTimeout(settle, 100); }
+      if (document.body) measureTop();
       save();
     } else if (gm.changed || local.changed) {
       save();
@@ -1059,5 +1061,5 @@ ul.hidden .kw { display: inline-block; font-weight: 600; color: #e5484d; margin-
   });
 
   // Teszteléshez és hibakereséshez.
-  window.__redditSzuro = { norm, parseList, buildMatcher, migrate, rescanAll, version: '1.6.0' };
+  window.__redditSzuro = { norm, parseList, buildMatcher, migrate, rescanAll, version: '1.6.1' };
 })();

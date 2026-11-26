@@ -69,7 +69,7 @@ A kártyára koppintva a poszt oldalára jutsz.
 
 Kártyanézetben a Reddit fejléce (menü, logó, értesítések), a kereső és a „For You / Following” fülsor eltűnik, csak a kártyák maradnak. Ezekhez a 🙈 panelen kapcsold ki a kártyanézetet. A legutóbb kiválasztott fül marad érvényben. Kép nélküli posztnál a háttér egy, a subreddithez igazodó színátmenet. Az apró bélyegképeket nem nyújtja szét, az NSFW- és spoilerképeket elmosva, címkével mutatja. Ha a Safari nem tudja lejátszani a videót, a videó előnézeti képe lesz a háttér.
 
-Egyszerre csak egy kártya látszik: a kártya mindig a ténylegesen látható magasságot tölti ki (a Safari összecsukódó sávjaival együtt), és amikor a lapozás megáll, a szomszédos kártyák elrejtőznek, így a következő kártya teteje az átlátszó eszköztár mögött sem bukkan elő. Húzás közben mindkettő látszik, hogy az átmenet sima legyen.
+Egyszerre csak egy kártya látszik: a kártya mindig a ténylegesen látható magasságot tölti ki (a Safari összecsukódó sávjaival együtt), és az a kártya, amelyikből csak egy kis csík látszik, elhalványul, így a következő kártya teteje az átlátszó eszköztár mögött sem bukkan elő. Húzás közben a beúszó kártya azonnal megjelenik.
 
 A kártyák csak fel-le lapozhatók: oldalra nem húzhatók, és a kép vagy a link sem fogható meg. (A képernyő legszéléről indított oldalra húzás a Safari saját vissza/előre mozdulata, azt egy weboldal nem tudja letiltani.)
 
@@ -123,6 +123,10 @@ Eszközönként külön, a Userscripts saját tárolójában és a reddit.com he
 - **Nincs 🙈 gomb:** a bővítmény nincs engedélyezve a reddit.com-on, vagy a fájl nem a Userscripts mappájában van.
 - **Van gomb, de 0, és látszanak a kulcsszavas posztok:** a Reddit valószínűleg átalakította az oldal felépítését. A szűrő az új felületen a `shreddit-post` elemeket figyeli (a kártya az őt körülvevő `article`, utána egy `hr`), az old.reddit.com-on a `.thing.link` elemeket. Ilyenkor a szkriptet frissíteni kell.
 
+## Megjegyzés a Safarihoz (fejlesztéshez)
+
+A kártyanézet a lap saját görgetését lapoztatja (`scroll-snap`). A Safari (WebKit) nem ugrik be, ha a kártyán vagy bármelyik szülőelemén (a `body`-t is beleértve) az `overflow` nem `visible`, és iOS-en akadozik, ha görgetés közben stílus íródik át. Ezért a kártyák kerekítése `clip-path`, az oldalra mozdulást a kártya szélessége és a `touch-action: pan-y` akadályozza meg, a feed utáni elemeket pedig külön vágjuk a képernyő szélességére.
+
 ## Korlátok
 
 - A hivatalos Reddit appban nem működik.
@@ -135,6 +139,7 @@ A szkript fejlécében benne van a frissítési cím, így a Userscripts és a T
 
 ## Verziók
 
+- **1.6.1** (2026-11-26): javítva, hogy iPhone-on a kártyák újra beugranak (az 1.5.3–1.6.0 egy Safari-hiba miatt szabad görgetést okozott).
 - **1.6.0** (2026-11-26): egyszerre csak egy kártya látszik, a következő teteje nem lóg be.
 - **1.5.3** (2026-11-26): kártyanézetben csak fel-le lehet lapozni, oldalra nem mozdul az oldal.
 - **1.5.2** (2026-11-26): a cím a korábbi méret 80%-a, a szöveg kisebb és legfeljebb 200 karakter.
