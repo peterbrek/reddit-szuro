@@ -4,7 +4,7 @@
 // @homepageURL  https://github.com/peterbrek/reddit-szuro
 // @updateURL    https://raw.githubusercontent.com/peterbrek/reddit-szuro/main/reddit-szuro.user.js
 // @downloadURL  https://raw.githubusercontent.com/peterbrek/reddit-szuro/main/reddit-szuro.user.js
-// @version      1.5.2
+// @version      1.5.3
 // @description  Elrejti a Reddit-feedből azokat a posztokat, amelyekben a megadott kulcsszavak szerepelnek.
 // @match        https://www.reddit.com/*
 // @match        https://old.reddit.com/*
@@ -302,8 +302,11 @@
   const CARD_UI_CSS = `
 :host { all: initial; position: absolute; inset: 0; z-index: 3; display: block; border-radius: 22px; overflow: hidden; }
 * { box-sizing: border-box; }
+a, img, video { -webkit-user-drag: none; user-drag: none; }
+img, video { pointer-events: none; }
 a {
   position: absolute; inset: 0; display: block; overflow: hidden;
+  touch-action: pan-y; -webkit-user-select: none; user-select: none;
   color: #fff; text-decoration: none; background: #111;
   font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
   -webkit-tap-highlight-color: transparent;
@@ -622,6 +625,10 @@ body.rpl-scroll-lock:has(shreddit-async-loader[bundlename="app_selector"]) {
 html { scroll-snap-type: y ${atEnd ? 'proximity' : 'mandatory'} !important; scroll-padding-top: var(--rsz-top, 0px) !important; }
 shreddit-feed { scroll-snap-align: end; }
 .${OFF} { display: none !important; }
+/* Csak függőleges lapozás: nincs vízszintes görgetés, a kártyát nem lehet oldalra húzni. */
+html { overflow-x: hidden !important; overscroll-behavior-x: none !important; }
+body { overflow-x: clip !important; }
+${CARD} { width: auto !important; max-width: none !important; touch-action: pan-y; touch-action: pan-y pinch-zoom; }
 ${CARD} {
   box-sizing: border-box !important;
   height: calc(100svh - var(--rsz-top, 0px) - 16px) !important;
@@ -1009,5 +1016,5 @@ ul.hidden .kw { display: inline-block; font-weight: 600; color: #e5484d; margin-
   });
 
   // Teszteléshez és hibakereséshez.
-  window.__redditSzuro = { norm, parseList, buildMatcher, migrate, rescanAll, version: '1.5.2' };
+  window.__redditSzuro = { norm, parseList, buildMatcher, migrate, rescanAll, version: '1.5.3' };
 })();
